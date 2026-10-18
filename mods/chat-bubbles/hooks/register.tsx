@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { ACCENT, CORNER, EDGE, SOFT, clip, editVerb, groupLine, isCommandText, isQuiet, pathLine, subject, userLabel } from './look'
+import { ACCENT, CORNER, EDGE, SOFT, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, pathLine, shortName, subject, userLabel } from './look'
 
 const COMMAND = 'doole_chat-bubbles'
 
@@ -10,6 +10,8 @@ export const register: Register = (on, options) => {
   const wantQuiet = isOn && options.quietTools !== false
   const wantLine = isOn && options.lineUnderReply !== false
   const name = userLabel(options.userName)
+  // Calls and runs the person opened with a press, by tool_use_id; lives as long as the session's mod.
+  const opened = new Set<string>()
 
   on('session.start', async ($, e, next) => {
     const ran = await next(e)
@@ -51,59 +53,70 @@ export const register: Register = (on, options) => {
     )
   }).catch(($, e, next) => next(e))
 
-  // A run of reads, searches and commands becomes one dim line.
+  const toggle = ($: { ui: { invalidate: (e: 'ui.render') => void } }, id: string) => () => {
+    if (!opened.delete(id)) opened.add(id)
+    $.ui.invalidate('ui.render')
+  }
+
+  // A run of calls becomes one line of marks and counts; pressing it unfolds the run into one line per call.
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     if (!wantQuiet || e.props.isExpanded) return next(e)
     if (e.props.calls.some(c => c.isErrored || c.isInterrupted)) return next(e)
-    const { Text } = $.ui.resolve(e)
+    const id = e.props.calls[0]?.tool_use_id
+    if (id && opened.has(id)) return next({ ...e, props: { ...e.props, isExpanded: true } })
+    const { Text, Button } = $.ui.resolve(e)
+    const line = `${e.props.isActive ? '… ' : ''}${groupLine(e.props.calls)}`
+    if (!id) return <Text color={SOFT} dimColor>{`  ▸ ${line}`}</Text>
     return (
-      <Text color={SOFT} dimColor>
-        {`  ${e.props.isActive ? '… ' : '· '}${groupLine(e.props.calls)}`}
-      </Text>
+      <Button key={`cbg:${id}`} plain onPress={toggle($, id)}>
+        <Text color={SOFT}>{'  ▸ '}</Text>
+        <Text color={ACCENT}>{line}</Text>
+      </Button>
     )
   }).catch(($, e, next) => next(e))
 
+  // One call: its mark and name (Code Edited, Hindsight Recall, Tool Used) and what it was about; pressing it shows what was done.
   on('ui.render', { component: 'ToolUse' }, async ($, e, next) => {
     const p = e.props
-    const verb = editVerb(p.tool)
-    if (wantQuiet && verb && !p.isErrored && !p.isInterrupted) {
-      const { Text } = $.ui.resolve(e)
-      const room = Math.max(20, (e.viewport?.columns ?? 80) - verb.length - 8)
-      return (
-        <Text color={SOFT}>
-          {'  '}
-          <Text bold color={ACCENT}>{p.isRunning ? `${verb}…` : verb}</Text>
-          {` ${clip(subject(p.input), room)}`}
-        </Text>
-      )
-    }
-    if (!wantQuiet || !isQuiet(p.tool) || p.isErrored || p.isInterrupted) return next(e)
-    const { Text } = $.ui.resolve(e)
-    const room = Math.max(20, (e.viewport?.columns ?? 80) - p.tool.length - 8)
+    if (!wantQuiet || keepsRow(p.tool) || p.isErrored || p.isInterrupted) return next(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const kind = kindOf(p.tool)
+    const isOpen = opened.has(p.tool_use_id)
+    const cols = e.viewport?.columns ?? 80
+    const room = Math.max(20, cols - kind.label.length - 10)
+    const about = clip(subject(p.input) || shortName(p.tool), room)
+    const line = (
+      <Button key={`cbt:${p.tool_use_id}`} plain onPress={toggle($, p.tool_use_id)}>
+        <Text color={SOFT}>{isOpen ? '  ▾ ' : '  ▸ '}</Text>
+        <Text bold color={ACCENT}>{`${kind.icon} ${kind.label}${p.isRunning ? '…' : ''}`}</Text>
+        <Text color={SOFT} dimColor>{`  ${about}`}</Text>
+      </Button>
+    )
+    if (!isOpen) return line
     return (
-      <Text color={SOFT} dimColor>
-        {`  ${p.isRunning ? '… ' : '· '}${p.tool} ${clip(subject(p.input), room)}`}
-      </Text>
+      <Box flexDirection="column">
+        {line}
+        {detailLines(p.tool, p.input, p.output, cols - 8).map((l, i) => (
+          <Text key={`d${i}`} color={SOFT} dimColor>{`      ${l}`}</Text>
+        ))}
+      </Box>
     )
   }).catch(($, e, next) => next(e))
 
-  // The output under a quiet call or an edit is left out; a failed call keeps its error.
+  // The output under a folded call is left out (an opened call shows it); a failed call keeps its error.
   on('ui.render', { component: 'ToolResult' }, async ($, e, next) => {
-    if (!wantQuiet || !(isQuiet(e.props.tool) || editVerb(e.props.tool)) || e.props.isErrored) return next(e)
+    if (!wantQuiet || keepsRow(e.props.tool) || e.props.isErrored) return next(e)
     const { Box } = $.ui.resolve(e)
     return <Box display="none" />
   }).catch(($, e, next) => next(e))
 
-  // The line under a finished reply, in place of "Baked for 3s".
+  // The line under a finished reply, in place of "Baked for 3s": a mark and the time.
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (!wantLine) return next(e)
     const { Box, Text } = $.ui.resolve(e)
-    const seconds = Math.max(0, Math.round(e.props.durationMs / 1000))
-    const folder = pathLine(await $.session.cwd(), (e.viewport?.columns ?? 80) - 4)
     return (
-      <Box flexDirection="column" marginBottom={1}>
-        <Text color={ACCENT} bold>{folder}</Text>
-        <Text bold color={ACCENT}>{`${CORNER}${seconds}s`}</Text>
+      <Box marginBottom={1}>
+        <Text bold color={ACCENT}>{`✻ ${duration(e.props.durationMs)}`}</Text>
       </Box>
     )
   }).catch(($, e, next) => next(e))

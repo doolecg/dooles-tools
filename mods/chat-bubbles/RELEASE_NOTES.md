@@ -1,3 +1,15 @@
+# Chat Bubbles 0.4.0
+
+## New
+- Every tool call is a named line with a mark: File Read, Searched, Command Run, Code Edited, Code Added, Hindsight Recall, Hindsight Saved, CodeGraph, Tool Used.
+- Press a line to open it and see what was done: the change for an edit, the command and its output for a shell, the input and result for the rest. Press again to close. A run of calls opens into one line per call.
+
+## Changed
+- The line under each finished reply is a mark and the time (`✻ 6s`), no longer the folder path.
+- Tool calls other than reads, searches and edits now fold too; errors still show in full.
+
+---
+
 # Chat Bubbles 0.3.0
 
 ## New

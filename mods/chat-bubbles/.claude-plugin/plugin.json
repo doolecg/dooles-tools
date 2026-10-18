@@ -1,8 +1,8 @@
 {
   "name": "chat-bubbles",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "license": "MIT",
-  "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under your name with a corner line, tool calls and code changes folded into one quiet line each, and the folder line under every finished reply.",
+  "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under your name with a corner line, every tool call as a named line (Code Edited, Hindsight Recall, Tool Used) that opens to show what was done, and the turn time under each finished reply.",
   "userConfig": {
     "enabled": {
       "type": "boolean",
@@ -24,14 +24,14 @@
     },
     "quietTools": {
       "type": "boolean",
-      "title": "Quiet tool calls",
-      "description": "Show each read, search, command and code change, or a run of them, as one line, with no diff. Errors still show in full.",
+      "title": "Named tool calls",
+      "description": "Show each tool call, or a run of them, as one named line (File Read, Code Edited, Hindsight Recall, Tool Used). Press a line to see what was done. Errors still show in full.",
       "default": true
     },
     "lineUnderReply": {
       "type": "boolean",
       "title": "Line under each reply",
-      "description": "Draw the folder and a corner line, with how long the turn took, under each finished reply.",
+      "description": "Draw a mark and how long the turn took under each finished reply.",
       "default": true
     }
   }
