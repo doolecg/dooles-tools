@@ -83,22 +83,19 @@ export const register: Register = (on, options) => {
     const kind = kindOf(p.tool)
     const isOpen = opened.has(p.tool_use_id)
     const cols = e.viewport?.columns ?? 80
-    const room = Math.max(20, cols - kind.label.length - 10)
-    const about = clip(subject(p.input) || shortName(p.tool), room)
-    const line = (
-      <Button key={`cbt:${p.tool_use_id}`} plain onPress={toggle($, p.tool_use_id)}>
-        <Text color={SOFT}>{isOpen ? '  ▾ ' : '  ▸ '}</Text>
-        <Text bold color={ACCENT}>{`${kind.icon} ${kind.label}${p.isRunning ? '…' : ''}`}</Text>
-        <Text color={SOFT} dimColor>{`  ${about}`}</Text>
-      </Button>
-    )
-    if (!isOpen) return line
+    const about = clip(subject(p.input) || shortName(p.tool), Math.max(20, cols - 8))
+    // The named call, then a corner line with its text; opened, what was done follows under the corner.
     return (
       <Box flexDirection="column">
-        {line}
-        {detailLines(p.tool, p.input, p.output, cols - 8).map((l, i) => (
-          <Text key={`d${i}`} color={SOFT} dimColor>{`      ${l}`}</Text>
-        ))}
+        <Button key={`cbt:${p.tool_use_id}`} plain onPress={toggle($, p.tool_use_id)}>
+          <Text color={SOFT}>{isOpen ? '  ▾ ' : '  ▸ '}</Text>
+          <Text bold color={ACCENT}>{`${kind.icon} ${kind.label}${p.isRunning ? '…' : ''}`}</Text>
+        </Button>
+        <Text color={SOFT}>{`  ${CORNER}${about}`}</Text>
+        {isOpen &&
+          detailLines(p.tool, p.input, p.output, cols - 8).map((l, i) => (
+            <Text key={`d${i}`} color={SOFT} dimColor>{`      ${l}`}</Text>
+          ))}
       </Box>
     )
   }).catch(($, e, next) => next(e))
@@ -110,7 +107,7 @@ export const register: Register = (on, options) => {
     return <Box display="none" />
   }).catch(($, e, next) => next(e))
 
-  // The line under a finished reply, in place of "Baked for 3s": a mark and the time.
+  // The line under a finished reply, in place of "Baked for 3s": the folder, then a corner line with a mark and the time.
   on('ui.render', { component: 'TurnDuration' }, async ($, e, next) => {
     if (!wantLine) return next(e)
     const { Box, Text } = $.ui.resolve(e)

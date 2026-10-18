@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.2
+
+## Changed
+- Each tool call is the named line, then a corner line with its text. No folder path under replies.
+
+---
+
 # Chat Bubbles 0.4.1
 
 ## Fixed
