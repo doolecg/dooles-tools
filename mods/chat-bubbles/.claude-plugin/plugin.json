@@ -1,0 +1,32 @@
+{
+  "name": "chat-bubbles",
+  "version": "0.2.0",
+  "license": "MIT",
+  "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under the folder with a corner line, tool calls and code changes folded into one quiet line each, and the folder line under every finished reply.",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Turn Chat Bubbles off to get Claude Code's normal transcript back.",
+      "default": true
+    },
+    "bubbles": {
+      "type": "boolean",
+      "title": "Chat bubbles",
+      "description": "Draw Claude's replies in rounded bubbles, and your messages under the folder with a corner line.",
+      "default": true
+    },
+    "quietTools": {
+      "type": "boolean",
+      "title": "Quiet tool calls",
+      "description": "Show each read, search, command and code change, or a run of them, as one line, with no diff. Errors still show in full.",
+      "default": true
+    },
+    "lineUnderReply": {
+      "type": "boolean",
+      "title": "Line under each reply",
+      "description": "Draw the folder and a corner line, with how long the turn took, under each finished reply.",
+      "default": true
+    }
+  }
+}
