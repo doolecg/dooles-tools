@@ -1,3 +1,13 @@
+# Chat Bubbles 0.3.0
+
+## New
+- Your messages show your name above the corner line ("Doole" by default). Set your own in Mod Settings (Your name).
+
+## Changed
+- Shell lines and slash commands still show the folder above them.
+
+---
+
 # Chat Bubbles 0.2.0
 
 ## New

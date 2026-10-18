@@ -8,6 +8,7 @@ Open with `/doole_chat-bubbles`. Change the options in Mod Settings (`/doole_set
 | --- | --- |
 | Enabled | Off gives back the normal transcript. |
 | Chat bubbles | Rounded bubbles for replies; your messages get the folder line and a corner instead. |
+| Your name | Shown above your messages (default Doole). Shell lines and slash commands show the folder instead. |
 | Quiet tool calls | One dim line per tool call, run of calls, or code change. |
 | Line under each reply | The folder and a corner line with the turn time under each finished reply. |
 

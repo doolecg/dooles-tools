@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { ACCENT, CORNER, EDGE, SOFT, clip, editVerb, groupLine, isQuiet, pathLine, subject } from './look'
+import { ACCENT, CORNER, EDGE, SOFT, clip, editVerb, groupLine, isCommandText, isQuiet, pathLine, subject, userLabel } from './look'
 
 const COMMAND = 'doole_chat-bubbles'
 
@@ -9,6 +9,7 @@ export const register: Register = (on, options) => {
   const wantBubbles = isOn && options.bubbles !== false
   const wantQuiet = isOn && options.quietTools !== false
   const wantLine = isOn && options.lineUnderReply !== false
+  const name = userLabel(options.userName)
 
   on('session.start', async ($, e, next) => {
     const ran = await next(e)
@@ -22,14 +23,14 @@ export const register: Register = (on, options) => {
       : 'Chat Bubbles is off. Turn it on in Mod Settings (/doole_settings) or /config.',
   })).catch(() => ({}))
 
-  // Your message: a soft rounded bubble with a small arrow, as the Operant shell draws its prompt.
+  // Your message: your name (or the folder, for a shell line or slash command) over a corner line, as the Operant shell draws its prompt.
   on('ui.render', { component: 'UserMessage' }, async ($, e, next) => {
     if (!wantBubbles || e.props.origin.kind !== 'composer') return next(e)
     const { Box, Text } = $.ui.resolve(e)
-    const folder = pathLine(await $.session.cwd(), (e.viewport?.columns ?? 80) - 4)
+    const head = isCommandText(e.props.text) ? pathLine(await $.session.cwd(), (e.viewport?.columns ?? 80) - 4) : name
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text color={ACCENT} bold>{folder}</Text>
+        <Text color={ACCENT} bold>{head}</Text>
         <Box>
           <Text bold color={ACCENT}>{CORNER}</Text>
           <Text color={ACCENT}>{'› '}</Text>

@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { clip, groupLine, isQuiet, pathLine, subject } from '../hooks/look'
+import { clip, groupLine, isCommandText, isQuiet, pathLine, subject, userLabel } from '../hooks/look'
 
 test('a run of calls reads as counts in the order the tools first appeared', () => {
   expect(groupLine([{ tool: 'Read' }, { tool: 'Bash' }, { tool: 'Read' }, { tool: 'Read' }])).toBe('read 3, ran 1')
@@ -27,4 +27,13 @@ test('the folder line is cut from the left when it is too wide', () => {
 test('only reads, searches and commands are quiet', () => {
   expect(isQuiet('Read')).toBe(true)
   expect(isQuiet('Edit')).toBe(false)
+})
+
+test('shell lines and slash commands keep the folder; the name falls back to Doole', () => {
+  expect(isCommandText('!ls')).toBe(true)
+  expect(isCommandText('  /doole_settings')).toBe(true)
+  expect(isCommandText('fix the bug')).toBe(false)
+  expect(userLabel('')).toBe('Doole')
+  expect(userLabel(undefined)).toBe('Doole')
+  expect(userLabel(' Sam ')).toBe('Sam')
 })

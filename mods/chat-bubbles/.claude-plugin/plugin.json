@@ -1,8 +1,8 @@
 {
   "name": "chat-bubbles",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MIT",
-  "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under the folder with a corner line, tool calls and code changes folded into one quiet line each, and the folder line under every finished reply.",
+  "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under your name with a corner line, tool calls and code changes folded into one quiet line each, and the folder line under every finished reply.",
   "userConfig": {
     "enabled": {
       "type": "boolean",
@@ -13,8 +13,14 @@
     "bubbles": {
       "type": "boolean",
       "title": "Chat bubbles",
-      "description": "Draw Claude's replies in rounded bubbles, and your messages under the folder with a corner line.",
+      "description": "Draw Claude's replies in rounded bubbles, and your messages under your name with a corner line.",
       "default": true
+    },
+    "userName": {
+      "type": "string",
+      "title": "Your name",
+      "description": "Shown above your messages. Shell lines and slash commands show the folder instead.",
+      "default": "Doole"
     },
     "quietTools": {
       "type": "boolean",

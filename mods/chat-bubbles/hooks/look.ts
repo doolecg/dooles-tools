@@ -50,3 +50,9 @@ export function pathLine(cwd: string, width: number): string {
   const w = Math.max(8, width)
   return cwd.length <= w ? cwd : `…${cwd.slice(cwd.length - (w - 1))}`
 }
+
+/** A shell line (`!ls`, or the engine's bash-input wrapper) or a slash command: these keep the folder above them. */
+export const isCommandText = (text: string): boolean => /^\s*(?:[!/]|<bash-input>)/.test(text)
+
+/** The name shown above your messages; a blank setting gives "Doole". */
+export const userLabel = (name: unknown): string => (typeof name === 'string' && name.trim() ? name.trim() : 'Doole')
