@@ -116,7 +116,7 @@ export const register: Register = (on, options) => {
     const { Box, Text } = $.ui.resolve(e)
     return (
       <Box marginBottom={1}>
-        <Text bold color={ACCENT}>{`✻ ${duration(e.props.durationMs)}`}</Text>
+        <Text bold color={ACCENT}>{`${CORNER}✻ ${duration(e.props.durationMs)}`}</Text>
       </Box>
     )
   }).catch(($, e, next) => next(e))

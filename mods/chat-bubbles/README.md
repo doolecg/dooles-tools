@@ -10,7 +10,7 @@ Open with `/doole_chat-bubbles`. Change the options in Mod Settings (`/doole_set
 | Chat bubbles | Rounded bubbles for replies; your messages get the folder line and a corner instead. |
 | Your name | Shown above your messages (default Doole). Shell lines and slash commands show the folder instead. |
 | Named tool calls | One named line per tool call or run of calls; press it to see what was done. |
-| Line under each reply | A mark and the turn time (`✻ 6s`) under each finished reply. |
+| Line under each reply | A corner line, a mark and the turn time (`╰─ ✻ 6s`) under each finished reply. |
 
 ## Limits
 

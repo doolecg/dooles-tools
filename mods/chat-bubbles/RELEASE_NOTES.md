@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.1
+
+## Fixed
+- The line under each finished reply keeps its corner line: `╰─ ✻ 6s`.
+
+---
+
 # Chat Bubbles 0.4.0
 
 ## New
