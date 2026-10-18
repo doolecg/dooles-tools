@@ -1,6 +1,6 @@
 {
   "name": "chat-bubbles",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "license": "MIT",
   "description": "Chat Bubbles: Claude's replies in soft rounded bubbles, your messages under your name with a corner line, every tool call as a named line (Code Edited, Hindsight Recall, Tool Used) that opens to show what was done, and the turn time under each finished reply.",
   "userConfig": {

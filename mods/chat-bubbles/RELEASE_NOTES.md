@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.3
+
+## Fixed
+- Chat Bubbles shows again. Since 0.4.0 Claude Code refused to load it, so the normal transcript showed instead.
+
+---
+
 # Chat Bubbles 0.4.2
 
 ## Changed

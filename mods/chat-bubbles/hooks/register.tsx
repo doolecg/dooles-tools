@@ -4,6 +4,14 @@ import { ACCENT, CORNER, EDGE, SOFT, clip, detailLines, duration, groupLine, isC
 
 const COMMAND = 'doole_chat-bubbles'
 
+// At the top of the file: the engine only lets `$` be passed to a function declared here.
+function toggle($: { ui: { invalidate: (e: 'ui.render') => void } }, opened: Set<string>, id: string) {
+  return () => {
+    if (!opened.delete(id)) opened.add(id)
+    $.ui.invalidate('ui.render')
+  }
+}
+
 export const register: Register = (on, options) => {
   const isOn = options.enabled !== false
   const wantBubbles = isOn && options.bubbles !== false
@@ -53,11 +61,6 @@ export const register: Register = (on, options) => {
     )
   }).catch(($, e, next) => next(e))
 
-  const toggle = ($: { ui: { invalidate: (e: 'ui.render') => void } }, id: string) => () => {
-    if (!opened.delete(id)) opened.add(id)
-    $.ui.invalidate('ui.render')
-  }
-
   // A run of calls becomes one line of marks and counts; pressing it unfolds the run into one line per call.
   on('ui.render', { component: 'ToolGroup' }, async ($, e, next) => {
     if (!wantQuiet || e.props.isExpanded) return next(e)
@@ -68,7 +71,7 @@ export const register: Register = (on, options) => {
     const line = `${e.props.isActive ? '… ' : ''}${groupLine(e.props.calls)}`
     if (!id) return <Text color={SOFT} dimColor>{`  ▸ ${line}`}</Text>
     return (
-      <Button key={`cbg:${id}`} plain onPress={toggle($, id)}>
+      <Button key={`cbg:${id}`} plain onPress={toggle($, opened, id)}>
         <Text color={SOFT}>{'  ▸ '}</Text>
         <Text color={ACCENT}>{line}</Text>
       </Button>
@@ -87,7 +90,7 @@ export const register: Register = (on, options) => {
     // The named call, then a corner line with its text; opened, what was done follows under the corner.
     return (
       <Box flexDirection="column">
-        <Button key={`cbt:${p.tool_use_id}`} plain onPress={toggle($, p.tool_use_id)}>
+        <Button key={`cbt:${p.tool_use_id}`} plain onPress={toggle($, opened, p.tool_use_id)}>
           <Text color={SOFT}>{isOpen ? '  ▾ ' : '  ▸ '}</Text>
           <Text bold color={ACCENT}>{`${kind.icon} ${kind.label}${p.isRunning ? '…' : ''}`}</Text>
         </Button>
