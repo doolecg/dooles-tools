@@ -6,8 +6,16 @@ export type Files = Record<string, string>
 
 type Rule = { plugins: string[]; files?: (f: Files) => boolean; prompt: RegExp }
 
-const GAME = ['router@awesome-gamedev-agent-skills', 'disciplines@awesome-gamedev-agent-skills']
+const GAME = ['router@awesome-gamedev-agent-skills', 'disciplines@awesome-gamedev-agent-skills', 'games@dooles-skills']
+const JSON_KEY = (key: string) => new RegExp(`"${key}"\\s*:`)
+const WEB_KEYS = [JSON_KEY('react-native'), JSON_KEY('vite'), JSON_KEY('expo')]
 const EXPO_KEY = /"expo"\s*:/
+const PACKAGE_JSONS = ['package.json', 'web/package.json']
+const PIXI = /"(pixi\.js|@pixi\/[\w-]+|pixi-filters)"\s*:/
+const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.yaml', 'compose.yml', 'compose.yaml', 'Dockerfile']
+/** A solution or project file at the session folder's top level; the hook adds these names (empty text) to the files. */
+const DOTNET_FILE = /\.(slnx|sln|csproj)$/i
+export const isDotnetFile = (name: string) => DOTNET_FILE.test(name)
 const GRADLE = ['build.gradle', 'build.gradle.kts', 'settings.gradle', 'settings.gradle.kts']
 
 export const RULES: Rule[] = [
@@ -31,18 +39,33 @@ export const RULES: Rule[] = [
     prompt: /\b(expo|react[- ]native|eas (build|update|submit)|expo[- ]router)\b/i,
   },
   {
-    plugins: ['minecraft-modding@dooles-skills', 'minecraft-multiloader@dooles-skills', 'minecraft-mod-dev@dooles-skills'],
+    plugins: ['minecraft-modding@dooles-skills', 'minecraft-multiloader@dooles-skills', 'games@dooles-skills'],
     files: f => /fabric|neoforge|minecraftforge|net\.minecraft/i.test(GRADLE.map(n => f[n] ?? '').join('\n')),
     prompt: /\b(minecraft|fabric|neoforge|forge mod|mixin)\b/i,
   },
   {
-    plugins: ['media-and-docs@dooles-skills'],
-    prompt: /\.(docx|xlsx|pdf|pptx)\b|\b(word doc|spreadsheet|excel|powerpoint)\b/i,
+    plugins: ['web-mobile@dooles-skills'],
+    files: f => WEB_KEYS.some(k => k.test(PACKAGE_JSONS.map(n => f[n] ?? '').join('\n'))),
+    prompt: /\b(react[- ]native|tsx|vite|expo|rn web)\b/i,
+  },
+  {
+    plugins: ['game-rendering@dooles-skills'],
+    files: f => PIXI.test(PACKAGE_JSONS.map(n => f[n] ?? '').join('\n')),
+    prompt: /\b(pixi(js)?|isometric|tilemaps?|sprite ?sheets?|texture atlas)\b/i,
+  },
+  {
+    plugins: ['backend@dooles-skills'],
+    files: f => Object.keys(f).some(k => DOTNET_FILE.test(k) || COMPOSE_FILES.includes(k)),
+    prompt: /asp\.?net|dotnet|\.net\b|\b(ef core|entity framework|npgsql|postgres(ql)?|csproj|dockerfile|docker[- ]compose|minimal apis?)\b|\bdocker\b/i,
+  },
+  {
+    plugins: ['ui-design@dooles-skills'],
+    prompt: /\b(ui|ux) (design|review|critique|heuristics?)\b|\b(accessibility|a11y|design review)\b/i,
   },
 ]
 
 /** Every file a rule may read, for the hook to load. */
-export const PROJECT_FILES = ['project.godot', 'ProjectSettings/ProjectVersion.txt', 'sdk/ProjectSettings/ProjectVersion.txt', 'package.json', 'app.json', ...GRADLE]
+export const PROJECT_FILES = ['project.godot', 'ProjectSettings/ProjectVersion.txt', 'sdk/ProjectSettings/ProjectVersion.txt', 'package.json', 'web/package.json', 'app.json', ...COMPOSE_FILES, ...GRADLE]
 
 /**
  * The plugins to switch on: from `files` (session start) or `prompt` (a prompt), keeping only installed

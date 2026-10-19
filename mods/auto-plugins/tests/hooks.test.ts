@@ -69,3 +69,17 @@ test('a plugin that is not installed is never enabled', async ($, on) => {
   await $.classic.UserPromptSubmit({ prompt: 'open report.docx', cwd: ROOT, source: 'user' } as never)
   expect(h.runs).toEqual([])
 })
+
+test('suggest mode: a hard UI prompt shows a note and tells Claude to use opus', async ($, on) => {
+  const h = host(on)
+  const r = await $.classic.UserPromptSubmit({ prompt: 'design the inventory screen layout from this mockup', cwd: ROOT, source: 'user' } as never)
+  expect(h.toasts.some(t => t.includes('Opus'))).toBe(true)
+  expect((r.additionalContext ?? []).join('\n')).toContain('model: "opus"')
+})
+
+test('suggest mode: an ordinary prompt adds no model note', async ($, on) => {
+  const h = host(on)
+  const r = await $.classic.UserPromptSubmit({ prompt: 'fix the typo in the readme', cwd: ROOT, source: 'user' } as never)
+  expect(h.toasts).toEqual([])
+  expect(r.additionalContext ?? []).toEqual([])
+})

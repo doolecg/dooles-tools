@@ -1,16 +1,28 @@
 {
   "name": "auto-plugins",
-  "version": "0.1.0",
-  "description": "Auto Plugins: switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, Minecraft modding, media and docs) on for this project only when the project or your prompt needs them, at local scope.",
-  "author": { "name": "doolecg" },
+  "version": "0.2.0",
+  "description": "Auto Plugins: switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, web and React Native, UI design, Minecraft modding) on for this project only when it needs them, and applies your worker-tier model presets (suggest or auto).",
+  "author": {
+    "name": "doolecg"
+  },
   "license": "MIT",
-  "types": "./types/index.d.ts",
   "userConfig": {
     "enabled": {
       "type": "boolean",
       "title": "Enabled",
       "description": "Turn off and Auto Plugins switches nothing on. Plugins it already turned on stay on.",
       "default": true
+    },
+    "modelMode": {
+      "type": "string",
+      "title": "Model presets",
+      "description": "How Auto Plugins uses your worker tiers (Haiku for very small tasks, Sonnet by default, Opus for hard tasks and UI design). off: nothing. suggest: a prompt that calls for another tier shows a note and tells Claude. auto: subagents started without a model get the tier their task calls for. Default: suggest.",
+      "options": [
+        "off",
+        "suggest",
+        "auto"
+      ],
+      "default": "suggest"
     }
   }
 }
