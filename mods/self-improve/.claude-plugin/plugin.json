@@ -1,6 +1,6 @@
 {
   "name": "self-improve",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "description": "Self Improve: learns from a session when you mark it done, keeps soul.md (facts about you and how Claude should respond) in step with Hindsight, and tunes skills over time with your approval.",
   "author": { "name": "doolecg" },
   "license": "MIT",
@@ -15,9 +15,9 @@
     "mode": {
       "type": "string",
       "title": "Review mode",
-      "description": "How much Self Improve does on its own. off: nothing runs. suggest: everything waits in /learn for your OK. controlled: low-risk lessons apply themselves. advanced: validated skill drafts apply too. Default: suggest.",
+      "description": "How much Self Improve does on its own. off: nothing runs. suggest: everything waits in /learn for your OK. controlled: low-risk lessons apply themselves. advanced: validated skill drafts apply too. Default: controlled.",
       "options": ["off", "suggest", "controlled", "advanced"],
-      "default": "suggest"
+      "default": "controlled"
     },
     "soulBank": {
       "type": "string",

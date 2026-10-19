@@ -1,6 +1,8 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import { soulPending } from '../hooks/core/actions'
+import { sessionBrief } from '../hooks/core/brief'
+import { projectSoulPath } from '../hooks/core/paths'
 import { connectHindsight, Hindsight } from '../hooks/core/hindsight'
 import { DEFAULT_SETTINGS, type Settings } from '../hooks/core/settings'
 import { addFacts, bankText, parseSoul, planPull, planPush, renderSoul, soulBrief, soulFacts } from '../hooks/core/soul'
@@ -110,7 +112,7 @@ describe('sync with the Soul Bank', () => {
     io.files.set(SOUL, EXISTING)
     withBank(io, 'soul', [{ id: 'a', text: 'Prefers plain commit messages with no attribution trailer' }])
     const st = emptyState()
-    const r = await syncSoul(io, st, settings(), await connectHindsight(io))
+    const r = await syncSoul(io, st, settings({ mode: 'suggest' }), await connectHindsight(io))
     expect(r.queued).toBe(1)
     expect(io.files.get(SOUL)).not.toContain('plain commit')
     await saveState(io, st)
@@ -233,5 +235,32 @@ describe('the old self-improve plugin (1.0.0)', () => {
     // Run twice: nothing new.
     const again = await migrateV1(io, st, settings(), hs, [])
     expect(again).toMatchObject({ soul: 0, lessons: 0 })
+  })
+})
+
+describe('project soul', () => {
+  const GLOBAL = renderSoul(addFacts(parseSoul(null), [{ section: 'respond', text: 'Keep replies short' }]).doc)
+  const project = (n: number) => renderSoul(addFacts(parseSoul(null), Array.from({ length: n }, (_, i) => ({ section: 'work', text: `distinct project fact ${i} about ${'p'.repeat(i)}${i}` }))).doc)
+
+  test('it follows the global soul in the brief and is capped at 1500 characters', () => {
+    const brief = sessionBrief(GLOBAL, 1500, 'Lessons here', project(80))
+    const [global, proj] = brief.split('\n\nAbout this project')
+    expect(global).toContain('Keep replies short')
+    expect(proj).toContain('distinct project fact 0')
+    expect(proj!.length).toBeLessThanOrEqual(1500)
+    expect(brief.endsWith('Lessons here') || brief.includes('Lessons here')).toBe(true)
+  })
+
+  test('without one the brief is unchanged', () => {
+    expect(sessionBrief(GLOBAL, 1500, 'L', null)).toBe(sessionBrief(GLOBAL, 1500, 'L'))
+    expect(sessionBrief(GLOBAL, 1500, 'L', null)).toBe(`${soulBrief(GLOBAL, 1500)}\n\nL`)
+  })
+
+  test('its path sits beside the project memory folder', () => {
+    expect(projectSoulPath(CONFIG, '/work/app', false)).toBe(`${CONFIG}/projects/-work-app/soul.md`)
+  })
+
+  test('the default review mode is controlled', () => {
+    expect(DEFAULT_SETTINGS.mode).toBe('controlled')
   })
 })

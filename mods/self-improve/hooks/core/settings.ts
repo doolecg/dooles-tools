@@ -26,7 +26,7 @@ export type Settings = {
 
 export const DEFAULT_SETTINGS: Settings = {
   enabled: true,
-  mode: 'suggest',
+  mode: 'controlled',
   learnModel: 'haiku',
   rewriteModel: 'sonnet',
   maxCalls: 4,

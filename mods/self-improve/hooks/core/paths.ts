@@ -55,6 +55,10 @@ export const projectDir = (config: string, folder: string, isWindows: boolean): 
 export const memoryDirFor = (config: string, folder: string, isWindows: boolean): string =>
   joinPath(isWindows, projectDir(config, folder, isWindows), 'memory')
 
+// Optional, hand-written: the project's own soul, loaded read-only into the session brief.
+export const projectSoulPath = (config: string, folder: string, isWindows: boolean): string =>
+  joinPath(isWindows, projectDir(config, folder, isWindows), 'soul.md')
+
 export const transcriptPathFor = (config: string, folder: string, sessionId: string, isWindows: boolean): string =>
   joinPath(isWindows, projectDir(config, folder, isWindows), `${sessionId}.jsonl`)
 

@@ -1,6 +1,6 @@
 # Self Improve
 
-Self Improve learns from a Claude Code session once you mark it done, keeps `soul.md` (facts about you and how Claude should respond to you), and tunes your skills over time. Nothing installs or rewrites a file without your approval in the default mode.
+Self Improve learns from a Claude Code session once you mark it done, keeps `soul.md` (facts about you and how Claude should respond to you), and tunes your skills over time. In the default mode (`controlled`) low-risk lessons apply themselves and every skill draft (new, fix or rewrite) waits in `/learn` for your approval. Plugin skills are never edited.
 
 ## Install
 
@@ -34,6 +34,8 @@ Answer `y` to add the marketplace, then pick the user scope. The Code tab of the
 
 Every session starts with soul.md (most important section first, cut at 1500 characters) and up to 6 lessons for the folder, as SessionStart context. Your CLAUDE.md is never edited.
 
+A project can have its own `<config>/projects/<folder>/soul.md` (the folder that holds the project's `memory` folder). It is read-only: its first 1500 characters follow the global soul in the session start, it is never sent to the Soul Bank and `/learn` never edits it. Keep secrets out of it.
+
 The first session seeds soul.md from your user and feedback memory files (and from the Soul Bank when Hindsight is set up). An existing soul.md is merged into, never overwritten. The first session also imports the old self-improve 1.0.0's saved preferences and facts; its data is left in place.
 
 ## Hindsight and CodeGraph (both optional)
@@ -44,8 +46,8 @@ The first session seeds soul.md from your user and feedback memory files (and fr
 ## Review modes (setting `mode`)
 
 - `off`: nothing runs.
-- `suggest` (default): every lesson, draft and Soul Bank fact waits in `/learn` for you to approve, edit or reject.
-- `controlled`: low-risk lessons apply themselves. A lesson that names a command, a link, "always" or "never" still waits.
+- `suggest`: every lesson, draft and Soul Bank fact waits in `/learn` for you to approve, edit or reject.
+- `controlled` (default): low-risk lessons apply themselves; every skill draft (new, fix or rewrite) waits in `/learn`. A lesson that names a command, a link, "always" or "never" still waits.
 - `advanced`: skill drafts that pass validation apply themselves too.
 
 Every automatic change is recorded with its before and after text and can be rolled back from `/learn`.
@@ -67,7 +69,7 @@ Set these in Mod Settings (`/doole_settings`) or `/plugin` (Self Improve, then c
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `enabled` | on | Master switch; off stops all learning, the session brief and the pane, and the commands say Self Improve is off |
-| `mode` | suggest | off, suggest, controlled, advanced |
+| `mode` | controlled | off, suggest, controlled, advanced |
 | `soulBank` | soul | Hindsight bank for soul.md |
 | `hindsightUrl` | empty | Hindsight server; empty uses `apiUrl` from `~/.hindsight/coding-agent.json` |
 | `learnModel` | haiku | (haiku, sonnet or opus) Model that reads a finished session |

@@ -57,8 +57,10 @@ export function lessonsBrief(state: State, folder: string, recent: readonly stri
   return out
 }
 
-export function sessionBrief(soulText: string | null, soulCap: number, lessons: string): string {
-  return [soulBrief(soulText, soulCap), lessons].filter(Boolean).join('\n\n')
+export const PROJECT_SOUL_CAP = 1500
+
+export function sessionBrief(soulText: string | null, soulCap: number, lessons: string, projectSoulText: string | null = null): string {
+  return [soulBrief(soulText, soulCap), soulBrief(projectSoulText, PROJECT_SOUL_CAP, 'About this project (from the project soul.md):'), lessons].filter(Boolean).join('\n\n')
 }
 
 // The recall tool's local half: soul.md lines and this folder's active lessons, ranked by words shared with the query.

@@ -142,14 +142,13 @@ export function replaceFact(doc: SoulDoc, before: string, after: string): SoulDo
 }
 
 // The brief a session starts with: facts in priority order (How to respond first), cut at `cap` characters.
-export function soulBrief(text: string | null, cap = 1500): string {
+export function soulBrief(text: string | null, cap = 1500, head = 'About the user (from soul.md):'): string {
   const doc = parseSoul(text)
   const rank = (t: string) => {
     const i = SECTION_ORDER.findIndex(k => SECTION_TITLES[k].toLowerCase() === t.toLowerCase())
     return i < 0 ? 50 : i
   }
   const sections = [...doc.sections].sort((a, b) => rank(a.title) - rank(b.title))
-  const head = 'About the user (from soul.md):'
   const lines: string[] = [head]
   let size = head.length
   for (const s of sections) {

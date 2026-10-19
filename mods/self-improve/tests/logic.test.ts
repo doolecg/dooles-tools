@@ -33,9 +33,9 @@ describe('host folder', () => {
 })
 
 describe('settings', () => {
-  test('defaults: suggest mode, a neutral soul bank, and the spec budgets', () => {
-    expect(settingsFrom(undefined)).toMatchObject({ mode: 'suggest', soulBank: 'soul', maxCalls: 4, maxTokens: 60000, maxChanges: 5, dailyUsd: 0.5 })
-    expect(settingsFrom({ mode: 'bogus', soulBank: 'my-soul', maxCalls: -3 })).toMatchObject({ mode: 'suggest', soulBank: 'my-soul', maxCalls: 0 })
+  test('defaults: controlled mode, a neutral soul bank, and the spec budgets', () => {
+    expect(settingsFrom(undefined)).toMatchObject({ mode: 'controlled', soulBank: 'soul', maxCalls: 4, maxTokens: 60000, maxChanges: 5, dailyUsd: 0.5 })
+    expect(settingsFrom({ mode: 'bogus', soulBank: 'my-soul', maxCalls: -3 })).toMatchObject({ mode: 'controlled', soulBank: 'my-soul', maxCalls: 0 })
   })
 })
 

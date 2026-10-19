@@ -30,10 +30,10 @@ describe('modes', () => {
     expect(io.asks.length).toBe(0)
   })
 
-  test('suggest (the default) holds every lesson for review and writes no file', async () => {
+  test('suggest holds every lesson for review and writes no file', async () => {
     const io = setup()
     io.answers.push(lesson())
-    const run = await learn(io, job(), settings())
+    const run = await learn(io, job(), settings({ mode: 'suggest' }))
     expect(run).toMatchObject({ extracted: 1, saved: 0, queued: 1 })
     const st = await loadState(io)
     expect(st.lessons[0]).toMatchObject({ status: 'pending', reviewReason: 'suggest mode: every lesson waits for review' })
@@ -71,7 +71,7 @@ describe('modes', () => {
   test('approving a waiting lesson writes it; rollback retires it, once', async () => {
     const io = setup()
     io.answers.push(lesson())
-    await learn(io, job(), settings())
+    await learn(io, job(), settings({ mode: 'suggest' }))
     const id = (await loadState(io)).lessons[0]!.id
     const hs = await connectHindsight(io)
     expect((await approveLesson(io, hs, id)).ok).toBe(true)

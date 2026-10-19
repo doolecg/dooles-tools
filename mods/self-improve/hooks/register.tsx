@@ -9,7 +9,7 @@ import type { Io, ModelReply } from './core/io'
 import { errText } from './core/io'
 import { claimJob, finishJob, isDue, listJobs, writeJob, workerArgv } from './core/jobs'
 import { bandLine, learn, type Job } from './core/learner'
-import { folderKey, hostConfigDir, joinPath, projectBank, transcriptPathFor } from './core/paths'
+import { folderKey, hostConfigDir, joinPath, projectBank, projectSoulPath, transcriptPathFor } from './core/paths'
 import { DEFAULT_SETTINGS, settingsFrom, type Settings } from './core/settings'
 import { validateDraft } from './core/skills'
 import { migrateV1, readSoul, seedSoul, syncSoul } from './core/soulSync'
@@ -98,7 +98,7 @@ async function buildBrief($: EngineInterface, io: Io, cwd: string): Promise<stri
   state.lastStart[key] = await io.now()
   await saveState(io, state).catch(() => undefined)
   const recent = await recentFiles(io, cwd)
-  const brief = sessionBrief(await readSoul(io), rt.s.soulCap, lessonsBrief(state, cwd, recent, since))
+  const brief = sessionBrief(await readSoul(io), rt.s.soulCap, lessonsBrief(state, cwd, recent, since), await io.read(projectSoulPath(io.config, cwd, io.isWindows)).catch(() => null))
   await update($, briefAtom, () => brief)
   return brief
 }
