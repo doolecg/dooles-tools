@@ -2,16 +2,16 @@
 
 # dooles-tools
 
-**Ten mods that reshape Claude Code's own interface.**
+**Eleven mods that reshape Claude Code's own interface.**
 A bottom bar, one menu for everything, live agent bars, and a settings panel.
 
-![Mods](https://img.shields.io/badge/mods-10-D97757)
+![Mods](https://img.shields.io/badge/mods-11-D97757)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin%20marketplace-6C5CE7)
 ![Terminal](https://img.shields.io/badge/works%20in-Terminal-2D3436)
 ![Desktop app](https://img.shields.io/badge/works%20in-Desktop%20app%20Code%20tab-2D3436)
 ![Licence](https://img.shields.io/badge/licence-MIT-2D3436)
 
-`✈  ✺  ✶  ◇  ✎  ▭  ⊘  ◎  ⚙  ◆`
+`✈  ✺  ✶  ◇  ✎  ▭  ⊘  ⊕  ◎  ⚙  ◆`
 
 </div>
 
@@ -75,6 +75,7 @@ Every mod opens with `/doole_<mod>`. The plugin id is what you pass to `claude p
 | ◇ | **Idea Shelf** | `idea-shelf` | `/doole_idea-shelf` | Park ideas with `/idea` while Claude works, one shelf per project. Send them later from `/ideas`. | 0.5.1 |
 | ◎ | **Context** | `context` | `/doole_context` | The footer on every tab (Hindsight, CodeGraph, git) and a count of test and fix passes. | 1.2.0 |
 | ⊘ | **Rule Guard** | `rule-guard` | none | Stops tool calls that break your standing rules and tells Claude why. Its rules are switches in its settings. | 1.1.0 |
+| ⊕ | **Auto Plugins** | `auto-plugins` | none | Switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, Minecraft modding, media and docs) on for this project only when the project or your prompt needs them. Run `/reload-plugins` after. | 0.1.0 |
 
 Main Menu was called Sidebar and Task View was called Clean View. The plugin ids did not change, so existing installs and settings carry over.
 

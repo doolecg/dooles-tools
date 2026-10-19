@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "dooles-tools",
-  "description": "doolecg's Claude Code mods: Main Menu, Flightdeck, Bottom Bar, Task View, Self Improve, Prompt Enhancer, Idea Shelf, Context, Rule Guard and Mod Settings. The skills are in doolecg/Dooles_Skills.",
+  "description": "doolecg's Claude Code mods: Main Menu, Flightdeck, Bottom Bar, Task View, Self Improve, Prompt Enhancer, Idea Shelf, Context, Rule Guard, Mod Settings, Chat Bubbles and Auto Plugins. The skills are in doolecg/Dooles_Skills.",
   "owner": {
     "name": "doolecg",
     "email": "doolecg@gmail.com"
@@ -72,6 +72,12 @@
       "description": "Claude's replies in soft bubbles, your messages under the folder with a corner line, tool calls and code changes folded to one line, and the folder line under each reply.",
       "category": "productivity",
       "source": "./mods/chat-bubbles"
+    },
+    {
+      "name": "auto-plugins",
+      "description": "Switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, Minecraft modding, media and docs) on for this project only when the project or your prompt needs them, then tells you to run /reload-plugins.",
+      "category": "productivity",
+      "source": "./mods/auto-plugins"
     }
   ]
 }

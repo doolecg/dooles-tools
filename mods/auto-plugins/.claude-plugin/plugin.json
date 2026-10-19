@@ -1,0 +1,16 @@
+{
+  "name": "auto-plugins",
+  "version": "0.1.0",
+  "description": "Auto Plugins: switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, Minecraft modding, media and docs) on for this project only when the project or your prompt needs them, at local scope.",
+  "author": { "name": "doolecg" },
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Turn off and Auto Plugins switches nothing on. Plugins it already turned on stay on.",
+      "default": true
+    }
+  }
+}
