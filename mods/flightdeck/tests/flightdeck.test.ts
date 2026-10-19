@@ -26,6 +26,9 @@ import {
   statusFromList,
   stepText,
   summaryOf,
+  noteUses,
+  useRows,
+  usesOf,
   wantOpen,
   windowOf,
 } from '../hooks/logic'
@@ -476,15 +479,10 @@ describe('wiring', () => {
       expect(all).toContain('dev-1.8.0')
       expect(all).toContain('2 changed')
       expect(all).toContain('2 ahead of main')
-      // The terminal keeps a legend; the app tags each file instead.
-      if (surface === 'terminal') {
-        expect(all).toContain('Claude read')
-        expect(all).toContain('Not committed')
-      } else {
-        expect(all).toContain('FILES THIS SESSION')
-        expect(all).toContain('edited')
-        expect(all).toContain('not committed')
-      }
+      // Skills, plugins and MCPs in use replace the file list.
+      expect(all).toContain('Skills')
+      expect(all).toContain('Plugins')
+      expect(all).toContain('MCPs')
       expect(all.toLowerCase()).toContain('now: running git status')
       expect(all).toContain('Cost')
       expect(all).toContain('Time')
@@ -534,8 +532,8 @@ describe('settings', () => {
     for (const surface of ['terminal', 'desktop'] as const) {
       const { ui, all } = await texts($, surface)
       expect(all.toLowerCase()).not.toContain('recent actions')
-      expect(all.toLowerCase()).not.toContain('files this session')
-      expect(all).not.toContain('Claude read')
+      expect(all.toLowerCase()).not.toContain('in use this session')
+      expect(all).not.toContain('Skills')
       expect(all).not.toContain('dev-1.8.0')
       await ui.unmount()
     }
@@ -549,5 +547,27 @@ describe('settings', () => {
     expect(all).toContain('RECENT ACTIONS')
     expect(all).toContain('dev-1.8.0')
     await ui.unmount()
+  })
+})
+
+describe('skills, plugins and MCPs in use', () => {
+  test('reads each from the tool call', () => {
+    expect(usesOf('Skill', { skill: 'superpowers:brainstorming' })).toEqual([
+      { kind: 'plugin', name: 'superpowers' },
+      { kind: 'skill', name: 'brainstorming' },
+    ])
+    expect(usesOf('Skill', { skill: 'simplify' })).toEqual([{ kind: 'skill', name: 'simplify' }])
+    expect(usesOf('mcp__playwright__browser_click', {})).toEqual([{ kind: 'mcp', name: 'playwright' }])
+    expect(usesOf('mcp__plugin_context-mode_context-mode__ctx_search', {})).toEqual([{ kind: 'plugin', name: 'context-mode' }])
+    expect(usesOf('Read', {})).toEqual([])
+  })
+
+  test('lists each once, grouped', () => {
+    const list = noteUses(noteUses([], usesOf('mcp__apify__call-actor', {})), usesOf('mcp__apify__search-actors', {}))
+    expect(useRows(list)).toEqual([
+      { kind: 'skill', label: 'Skills', names: [] },
+      { kind: 'plugin', label: 'Plugins', names: [] },
+      { kind: 'mcp', label: 'MCPs', names: ['apify'] },
+    ])
   })
 })

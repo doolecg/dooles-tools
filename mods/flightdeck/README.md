@@ -42,7 +42,7 @@ With the Sidebar mod installed, Flightdeck can be one of its tabs. It then draws
 
 - **Right now:** a card at the top saying what Claude is doing this moment (editing a file, reading, running a command, searching, thinking, waiting for you, or idle), the lines added and removed by its last edit, and the current Task View step when that mod has one.
 - **Last few actions:** the five most recent tool calls of the main session, newest first, in plain words with how long ago (Edited desktop.tsx, Ran a command, Started agent...).
-- **Branch and files:** the git branch with how many files changed and how far ahead of main it is (left out when the folder is not a git repo), Self Improve's lessons line when that mod is installed, and the five most recent files marked read, edited or not committed.
+- **Branch and files:** the git branch with how many files changed and how far ahead of main it is (left out when the folder is not a git repo), Self Improve's lessons line when that mod is installed, and the skills, plugins and MCP servers this session has used (each line says none yet until one is used).
 - **Totals:** Cost, Tokens and Time of the subagents as three tiles.
 - **Main session:** the model and its context size, effort, whether Claude is working, a context meter with the session's cost, your 5-hour and 7-day usage meters (when your plan reports them), how long the turn has run and how many requests it made.
 - **Running:** one outlined bar per running subagent, newest first: the task, its time and a **■ stop** button on the top edge, a moving pixel bar inside (Task View's flickering look, with a glowing front), and its nickname, model, type and `ctx % · tokens ≈cost` on the bottom edge. While it works, its latest action shows as `now: running git status`. **■ Stop all** in the heading stops every one. Stopping goes through Claude Code's TaskStop tool, so it may ask you first; if an agent cannot be stopped, a toast says why.
@@ -68,7 +68,7 @@ Set in Mod Settings (`/doole_settings`) in the desktop app, or in `/config` in t
 | --- | --- | --- |
 | Enabled | on | Off stops Flightdeck drawing or watching anything; `/flightdeck` then says it is off. |
 | Recent actions shown | 5 | How many of Claude's latest tool calls to list (0 to 12; 0 hides the list). |
-| Files shown | 5 | How many recent files to list (0 to 50; 0 hides the list and its key). |
+| Skills, plugins and MCPs shown | 5 | 0 hides the Skills, Plugins and MCPs lines; any other value shows them. |
 | Show branch and memory lines | on | The git branch line and Self Improve's memory line. |
 | Git check interval (seconds) | 4 | At most how often git is asked (1 to 120). |
 | Agent check interval (seconds) | 2 | How often running subagents are checked while the sidebar is open (1 to 30). |

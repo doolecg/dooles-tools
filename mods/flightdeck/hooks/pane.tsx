@@ -1,12 +1,11 @@
 import type { RenderElement } from 'claude-code'
-import type { FdAgent, FdCall, FdFile, FdGit, FdMain, FdUsage } from '../types'
+import type { FdAgent, FdCall, FdFile, FdGit, FdMain, FdUsage, FdUse } from '../types'
 import { critterOf, critterPixels, rasterOf, smallPixels, svgOf } from './critter'
 import { barSvg } from './pixel-bar'
 import {
   actionOf,
   agentMetrics,
   agoText,
-  fileRows,
   fmtDuration,
   fmtUsd,
   groupAgents,
@@ -15,6 +14,7 @@ import {
   paletteFor,
   recentActions,
   summaryOf,
+  useRows,
   windowLabel,
   windowOf,
   type Headline,
@@ -47,6 +47,8 @@ export type PaneData = {
   /** The main session's recent tool calls and files, the repository, and what Claude is doing this moment. */
   calls: FdCall[]
   files: FdFile[]
+  /** The skills, plugins and MCP servers this session has used. */
+  uses: FdUse[]
   git: FdGit | null
   /** Self Improve's one-line summary; undefined without that mod. */
   lessons?: string
@@ -269,7 +271,7 @@ function drawApp(els: Record<string, any>, surface: string, d: PaneData): { el: 
   const recentCount = d.recentCount ?? 5
   const showRepo = d.showRepo !== false
   const acts = recentActions(d.calls, recentCount)
-  const files = fileRows(d.files, d.git, d.fileCount ?? 5)
+  const uses = (d.fileCount ?? 5) > 0 ? useRows(d.uses) : []
   const isEditingNow = rn.title.startsWith('Claude is editing')
   const rightNow = (
     <Box key="right-now" flexDirection="column" borderStyle="round" borderColor={pal.sep} paddingX={1} rowGap={1}>
@@ -322,26 +324,10 @@ function drawApp(els: Record<string, any>, surface: string, d: PaneData): { el: 
           {d.lessons ? pair('lessons', 'Memory', <Text color={pal.text}>{d.lessons.replace(/^Memory:\s*/, '')}</Text>) : null}
         </Box>
       ) : null}
-      {files.length > 0 ? (
+      {uses.length > 0 ? (
         <Box flexDirection="column">
-          {section('files-h', '▤', 'Files this session')}
-          {files.map(f => (
-            <Box key={`file:${f.path}`} columnGap={1} justifyContent="space-between">
-              <Box columnGap={1} flexShrink={1} minWidth={0}>
-                <Text color={f.kind === 'edit' ? fx.edit : fx.read}>{'●'}</Text>
-                <Text color={pal.text} bold wrap="truncate-middle">
-                  {f.name}
-                </Text>
-                <Text color={pal.dim} wrap="truncate-start">
-                  {f.dir}
-                </Text>
-              </Box>
-              <Box columnGap={1} flexShrink={0}>
-                {f.isUncommitted ? <Text color={fx.dirty}>not committed</Text> : null}
-                <Text color={f.kind === 'edit' ? fx.edit : fx.read}>{f.kind === 'edit' ? 'edited' : 'read'}</Text>
-              </Box>
-            </Box>
-          ))}
+          {section('uses-h', '▤', 'In use this session')}
+          {uses.map(u => pair(`use:${u.kind}`, u.label, <Text color={u.names.length > 0 ? pal.text : pal.dim}>{u.names.length > 0 ? u.names.join(', ') : 'none yet'}</Text>))}
         </Box>
       ) : null}
     </Box>
@@ -531,7 +517,7 @@ export function drawPane(els: Record<string, any>, surface: string, d: PaneData)
   const fileCount = d.fileCount ?? 5
   const showRepo = d.showRepo !== false
   const acts = recentActions(d.calls, recentCount)
-  const files = fileRows(d.files, d.git, fileCount)
+  const uses = useRows(d.uses)
   const nowRows: unknown[] = [
     line('rn-cap', <Text color={pal.dim} bold>{'✶ RIGHT NOW'}</Text>),
     line('rn-title', <Text color={rn.isWaiting ? pal.warn : pal.text} bold wrap="truncate-end">{rn.title}</Text>),
@@ -591,31 +577,18 @@ export function drawPane(els: Record<string, any>, surface: string, d: PaneData)
       ),
     )
   }
-  if (fileCount > 0) nowRows.push(
-    line(
-      'rn-legend',
-      <Text wrap="truncate-end">
-        <Text color={fx.read}>■</Text>
-        <Text color={pal.dim}>{' Claude read  '}</Text>
-        <Text color={fx.edit}>■</Text>
-        <Text color={pal.dim}>{' Claude edited  '}</Text>
-        <Text color={fx.dirty}>■</Text>
-        <Text color={pal.dim}>{' Not committed'}</Text>
-      </Text>,
-    ),
-  )
-  for (const f of files) {
-    nowRows.push(
-      line(
-        `file:${f.path}`,
-        <Text wrap="truncate-end">
-          <Text color={f.kind === 'edit' ? fx.edit : fx.read}>{'■ '}</Text>
-          <Text color={pal.text}>{f.name}</Text>
-          <Text color={pal.dim}>{` ${f.dir}`}</Text>
-          {f.isUncommitted ? <Text color={fx.dirty}>{' ●'}</Text> : null}
-        </Text>,
-      ),
-    )
+  if (fileCount > 0) {
+    for (const u of uses) {
+      nowRows.push(
+        line(
+          `use:${u.kind}`,
+          <Text wrap="truncate-end">
+            <Text color={pal.dim} bold>{`${u.label} `}</Text>
+            <Text color={u.names.length > 0 ? pal.text : pal.dim}>{u.names.length > 0 ? u.names.join(', ') : 'none yet'}</Text>
+          </Text>,
+        ),
+      )
+    }
   }
   row += nowRows.length
 

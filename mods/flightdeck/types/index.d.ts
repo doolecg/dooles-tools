@@ -38,6 +38,9 @@ export type FdCall = {
 /** A file Claude read or edited, newest first. */
 export type FdFile = { path: string; kind: 'read' | 'edit'; at: number }
 
+/** A skill, plugin or MCP server this session has used. */
+export type FdUse = { kind: 'skill' | 'plugin' | 'mcp'; name: string }
+
 /** The last edit's size, from the tool's own record. */
 export type FdEdit = { path: string; added: number; removed: number }
 
@@ -89,6 +92,7 @@ declare module 'claude-code' {
       cleared: string[]
       calls: FdCall[]
       files: FdFile[]
+      uses: FdUse[]
       lastEdit: FdEdit | null
       pending: FdPending | null
       git: FdGit | null

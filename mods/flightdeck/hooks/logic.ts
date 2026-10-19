@@ -1,4 +1,4 @@
-import type { FdAgent, FdCall, FdEdit, FdFile, FdGit, FdLimit, FdMain, FdPending, FdStatus, FdUsage } from '../types'
+import type { FdAgent, FdCall, FdEdit, FdFile, FdGit, FdLimit, FdMain, FdPending, FdStatus, FdUsage, FdUse } from '../types'
 
 export const EMPTY_MAIN: FdMain = { model: '', effort: '', steps: 0, isRunning: false, turnStartedAt: 0, turnEndedAt: 0 }
 export const EMPTY_USAGE: FdUsage = { ctxPct: null, ctxTokens: null, window: 0, costUsd: null, limits: [] }
@@ -460,6 +460,38 @@ export function touchFile(files: readonly FdFile[], path: string, kind: 'read' |
   const rest = files.filter(f => pathKey(f.path) !== key)
   return [{ path, kind: old?.kind === 'edit' || kind === 'edit' ? 'edit' : 'read', at }, ...rest].slice(0, 50)
 }
+
+/** What a tool call shows in use: a skill, the plugin it or an MCP server comes from, or an MCP server. */
+export function usesOf(tool: string, input: unknown): FdUse[] {
+  const i = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>
+  const out: FdUse[] = []
+  if (tool === 'Skill' && typeof i.skill === 'string' && i.skill) {
+    const [head, ...rest] = i.skill.split(':')
+    if (rest.length > 0) out.push({ kind: 'plugin', name: head! })
+    out.push({ kind: 'skill', name: rest.length > 0 ? rest.join(':') : head! })
+  } else if (tool.startsWith('mcp__')) {
+    const server = tool.split('__')[1] ?? ''
+    const fromPlugin = /^plugin_(.+?)_[^_]+(?:-[^_]+)*$/.exec(server)
+    if (server.startsWith('plugin_')) out.push({ kind: 'plugin', name: fromPlugin?.[1] ?? server.slice(7) })
+    else if (server) out.push({ kind: 'mcp', name: server.replace(/^claude_ai_/, '').replace(/_/g, ' ') })
+  }
+  return out
+}
+
+/** Adds the uses a call shows to the session's list, once each. */
+export const noteUses = (list: readonly FdUse[], uses: readonly FdUse[]): FdUse[] => {
+  const next = [...list]
+  for (const u of uses) if (!next.some(x => x.kind === u.kind && x.name === u.name)) next.push(u)
+  return next.slice(-60)
+}
+
+/** The three lines of the pane: each kind and what was used, in the order it first appeared. */
+export const useRows = (list: readonly FdUse[]): { kind: FdUse['kind']; label: string; names: string[] }[] =>
+  (['skill', 'plugin', 'mcp'] as const).map(kind => ({
+    kind,
+    label: kind === 'skill' ? 'Skills' : kind === 'plugin' ? 'Plugins' : 'MCPs',
+    names: list.filter(u => u.kind === kind).map(u => u.name),
+  }))
 
 /** Adds a call, or replaces the one with its id, keeping the newest few. */
 export const addCall = (calls: readonly FdCall[], call: FdCall): FdCall[] => [...calls.filter(c => c.id !== call.id), call].slice(-12)

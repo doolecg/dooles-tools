@@ -18,6 +18,7 @@ import {
   isWorking,
   limitOf,
   newAgent,
+  noteUses,
   paletteFor,
   parseGitStatus,
   pendingText,
@@ -25,6 +26,7 @@ import {
   statusFromReason,
   stepText,
   touchFile,
+  usesOf,
   wantOpen,
 } from './logic'
 import { drawPane, type PaneLayout } from './pane'
@@ -48,6 +50,7 @@ const doneOffsetAtom = atom({ plugin: 'flightdeck', key: 'doneOffset' } as const
 const clearedAtom = atom({ plugin: 'flightdeck', key: 'cleared' } as const, [])
 const callsAtom = atom({ plugin: 'flightdeck', key: 'calls' } as const, [])
 const filesAtom = atom({ plugin: 'flightdeck', key: 'files' } as const, [])
+const usesAtom = atom({ plugin: 'flightdeck', key: 'uses' } as const, [])
 const lastEditAtom = atom({ plugin: 'flightdeck', key: 'lastEdit' } as const, null)
 const pendingAtom = atom({ plugin: 'flightdeck', key: 'pending' } as const, null)
 const gitAtom = atom({ plugin: 'flightdeck', key: 'git' } as const, null)
@@ -297,6 +300,7 @@ export const register: Register = (on, options) => {
         await update($, clearedAtom, () => [])
         await update($, callsAtom, () => [])
         await update($, filesAtom, () => [])
+        await update($, usesAtom, () => [])
         await update($, lastEditAtom, () => null)
         await update($, pendingAtom, () => null)
         await update($, mainAtom, m => ({ ...EMPTY_MAIN, model: m.model, effort: m.effort }))
@@ -432,6 +436,8 @@ export const register: Register = (on, options) => {
       const at = await $.clock.now()
       const made = callOf(String(e.tool_use_id ?? `${e.tool}@${at}`), e.tool, input, at)
       call = made
+      const uses = usesOf(e.tool, input)
+      if (uses.length > 0) await update($, usesAtom, list => noteUses(list ?? [], uses))
       if (id === undefined) {
         await update($, callsAtom, list => addCall(list ?? [], made))
         if (e.tool === 'AskUserQuestion') await update($, pendingAtom, () => ({ text: pendingText(e.tool, input), tool: e.tool }))
@@ -525,6 +531,7 @@ export const register: Register = (on, options) => {
       main,
       calls,
       files: await read($, filesAtom),
+      uses: await read($, usesAtom),
       git: await read($, gitAtom),
       lessons: notes.lessons,
       recentCount: cfg.recentActions,

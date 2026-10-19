@@ -1,6 +1,6 @@
 {
   "name": "flightdeck",
-  "version": "1.7.1",
+  "version": "1.9.0",
   "description": "A Flightdeck-style sidebar with the main session's vitals and every subagent working now, each as an outlined pixel progress bar with a stop button.",
   "author": {
     "name": "doolecg"
@@ -22,8 +22,8 @@
     },
     "recentFiles": {
       "type": "number",
-      "title": "Files shown",
-      "description": "How many recently read or edited files the file list shows, from 0 to 50. 0 hides the list. Default: 5.",
+      "title": "Skills, plugins and MCPs shown",
+      "description": "Set to 0 to hide the Skills, Plugins and MCPs lines. Any other value shows them. Default: 5.",
       "default": 5
     },
     "showRepository": {
