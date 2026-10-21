@@ -125,3 +125,11 @@ The original build brief is in [`mods/PROMPT.md`](mods/PROMPT.md).
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind, as set out in the [LICENSE](LICENSE). To the extent permitted by law, the authors are not liable for any loss or damage from using it, including lost data, lost work or damage to files or projects. Nothing here limits liability that cannot be limited by law, such as for death or personal injury caused by negligence.
+
+Back up your work before using it. You use it at your own risk.
+
+Not affiliated with or endorsed by Anthropic. The mods run inside Claude Code; what Claude Code sends to Anthropic is covered by Anthropic's terms. AI output can be wrong; check it before relying on it. Some mods change your own files, such as skills and memory notes, so back them up first.
