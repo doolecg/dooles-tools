@@ -41,7 +41,7 @@ export const register: Register = (on, options) => {
     return (
       <Box flexDirection="column" marginTop={1}>
         <Text color={USER} bold>{head}</Text>
-        <Box borderStyle="bold" borderColor={USER} paddingX={1}>
+        <Box borderStyle="round" borderColor={USER} paddingX={1}>
           <Text color={SOFT}>{e.props.text}</Text>
         </Box>
       </Box>
@@ -53,7 +53,7 @@ export const register: Register = (on, options) => {
     if (!wantBubbles) return next(e)
     const { Box, Markdown } = $.ui.resolve(e)
     return (
-      <Box borderStyle="bold" borderColor={e.props.isSummary ? SUMMARY : REPLY} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
+      <Box borderStyle="round" borderColor={e.props.isSummary ? SUMMARY : REPLY} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
         <Markdown text={e.props.text} />
       </Box>
     )

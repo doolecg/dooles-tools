@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.5
+
+## Changed
+- Bubbles are rounded again. The thick edge in 0.4.4 had square corners.
+
+---
+
 # Chat Bubbles 0.4.4
 
 ## Changed
