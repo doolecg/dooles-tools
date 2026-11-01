@@ -18,5 +18,5 @@ Open with `/doole_chat-bubbles`. Change the options in Mod Settings (`/doole_set
 - Opening a line needs a click or Enter on it; if your terminal does not pass presses to the transcript, ctrl+o still opens a run of calls.
 - The text colour of Claude's reply comes from your terminal theme; only the bubble edges are tinted.
 - Pasting images into the prompt box is a Claude Code feature, not a mod's: press ctrl+v (alt+v in Windows Terminal) with an image on the clipboard. A mod cannot change the prompt box itself.
-- Windows file paths in replies (also inside backticks) become `file:` links. Paths cut at the first space unless they are in backticks.
+- Windows file paths in replies (also inside backticks) become `file:` links; a click opens the file with its default program (Windows, terminal only). Programs and scripts are never opened. Paths cut at the first space unless they are in backticks.
 - Each reply block (text between tool calls) gets its own bubble.

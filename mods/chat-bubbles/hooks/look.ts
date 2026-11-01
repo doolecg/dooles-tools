@@ -148,3 +148,12 @@ export function linkPaths(text: string): string {
     )
     .join('')
 }
+
+/** The `file:` links in a markdown text, as written. */
+export const fileLinks = (text: string): string[] => [...text.matchAll(/\]\((file:\/\/\/[^)\s]+)\)/g)].map(m => m[1]!)
+
+/** The Windows path a `file:///C:/a%20b` link points at. */
+export const hrefPath = (href: string): string => decodeURI(href.replace(/^file:\/\/\//, '')).replace(/\//g, String.fromCharCode(92))
+
+/** Programs and scripts are never opened from a link: a click could run them. */
+export const isRunnable = (path: string): boolean => /\.(?:exe|com|bat|cmd|msi|scr|ps1|psm1|vbs|vbe|js|jse|wsf|hta|lnk|jar|reg|dll|cpl)$/i.test(path)

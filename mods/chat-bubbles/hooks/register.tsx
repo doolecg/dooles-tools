@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { ACCENT, CORNER, REPLY, SOFT, SUMMARY, USER, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, linkPaths, pathLine, shortName, subject, userLabel } from './look'
+import { ACCENT, CORNER, REPLY, SOFT, SUMMARY, USER, clip, detailLines, duration, fileLinks, groupLine, hrefPath, isCommandText, isRunnable, keepsRow, kindOf, linkPaths, pathLine, shortName, subject, userLabel } from './look'
 
 const COMMAND = 'doole_chat-bubbles'
 
@@ -9,6 +9,14 @@ function toggle($: { ui: { invalidate: (e: 'ui.render') => void } }, opened: Set
   return () => {
     if (!opened.delete(id)) opened.add(id)
     $.ui.invalidate('ui.render')
+  }
+}
+
+// A click on a file link opens the file with Windows' default program; programs and scripts are never opened.
+function openFile($: { process: { run: (argv: readonly string[]) => Promise<unknown> } }) {
+  return (link: { href: string }) => {
+    const path = hrefPath(link.href)
+    if (!isRunnable(path)) void $.process.run(['explorer.exe', path]).catch(() => undefined)
   }
 }
 
@@ -52,9 +60,10 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
     if (!wantBubbles) return next(e)
     const { Box, Markdown } = $.ui.resolve(e)
+    const text = linkPaths(e.props.text)
     return (
       <Box borderStyle="round" borderColor={e.props.isSummary ? SUMMARY : REPLY} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
-        <Markdown text={linkPaths(e.props.text)} />
+        <Markdown key={`cbl:${text.length}:${text.slice(0, 24)}`} text={text} pressableLinks={fileLinks(text)} onLinkPress={openFile($)} />
       </Box>
     )
   }).catch(($, e, next) => next(e))

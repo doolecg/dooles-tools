@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, linkPaths, outputText, pathLine, subject, userLabel } from '../hooks/look'
+import { clip, detailLines, duration, fileLinks, groupLine, hrefPath, isCommandText, isRunnable, keepsRow, kindOf, linkPaths, outputText, pathLine, subject, userLabel } from '../hooks/look'
 
 test('a run of calls reads as marks and counts in the order each kind first appeared', () => {
   expect(groupLine([{ tool: 'Read' }, { tool: 'Bash' }, { tool: 'Read' }, { tool: 'Read' }])).toBe('▤ File Read 3  ❯ Command Run 1')
@@ -55,4 +55,12 @@ test('file paths in a reply become links; code fences and existing links stay as
   expect(linkPaths('`E:\\REPOS\\AI TOOLS\\x.tsx:12`')).toBe('[`E:\\REPOS\\AI TOOLS\\x.tsx:12`](file:///E:/REPOS/AI%20TOOLS/x.tsx)')
   expect(linkPaths('```\nC:\\a\\b\n```')).toBe('```\nC:\\a\\b\n```')
   expect(linkPaths('[x](file:///C:/a/b)')).toBe('[x](file:///C:/a/b)')
+})
+
+test('a file link turns back into a path, and programs are never opened', () => {
+  const text = linkPaths('See `E:\\REPOS\\AI TOOLS\\x.tsx` and C:\\a\\run.exe')
+  expect(fileLinks(text)).toEqual(['file:///E:/REPOS/AI%20TOOLS/x.tsx', 'file:///C:/a/run.exe'])
+  expect(hrefPath('file:///E:/REPOS/AI%20TOOLS/x.tsx')).toBe('E:\\REPOS\\AI TOOLS\\x.tsx')
+  expect(isRunnable('C:\\a\\run.EXE')).toBe(true)
+  expect(isRunnable('C:\\a\\notes.md')).toBe(false)
 })

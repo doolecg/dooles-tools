@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.7
+
+## Fixed
+- Clicking a file path in a reply now opens the file with its normal program. Programs and scripts (.exe, .bat, .ps1 and similar) are never opened from a link.
+
+---
+
 # Chat Bubbles 0.4.6
 
 ## New
