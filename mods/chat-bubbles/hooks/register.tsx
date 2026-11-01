@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { ACCENT, CORNER, REPLY, SOFT, SUMMARY, USER, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, pathLine, shortName, subject, userLabel } from './look'
+import { ACCENT, CORNER, REPLY, SOFT, SUMMARY, USER, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, linkPaths, pathLine, shortName, subject, userLabel } from './look'
 
 const COMMAND = 'doole_chat-bubbles'
 
@@ -54,7 +54,7 @@ export const register: Register = (on, options) => {
     const { Box, Markdown } = $.ui.resolve(e)
     return (
       <Box borderStyle="round" borderColor={e.props.isSummary ? SUMMARY : REPLY} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
-        <Markdown text={e.props.text} />
+        <Markdown text={linkPaths(e.props.text)} />
       </Box>
     )
   }).catch(($, e, next) => next(e))

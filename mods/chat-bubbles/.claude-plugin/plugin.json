@@ -1,6 +1,6 @@
 {
   "name": "chat-bubbles",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "license": "MIT",
   "description": "Chat Bubbles: your messages, Claude's replies and summaries in rounded bubbles of their own colour (blue, green, purple), every tool call as a named line (Code Edited, Hindsight Recall, Tool Used) that opens to show what was done, and the turn time under each finished reply.",
   "userConfig": {

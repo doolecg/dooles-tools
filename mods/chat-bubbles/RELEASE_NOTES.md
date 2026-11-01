@@ -1,3 +1,10 @@
+# Chat Bubbles 0.4.6
+
+## New
+- File paths in Claude's replies are links. Click one (ctrl-click in the terminal) to open the file.
+
+---
+
 # Chat Bubbles 0.4.5
 
 ## Changed

@@ -132,3 +132,19 @@ export const isCommandText = (text: string): boolean => /^\s*(?:[!/]|<bash-input
 
 /** The name shown above your messages; a blank setting gives "Doole". */
 export const userLabel = (name: unknown): string => (typeof name === 'string' && name.trim() ? name.trim() : 'Doole')
+
+const fileHref = (path: string): string => 'file:///' + encodeURI(path.replace(/\\/g, '/').replace(/:\d+(?::\d+)?$/, ''))
+
+/** Windows file paths in a reply become `file:` links, so a click opens them. Fenced code is left alone; a path in `backticks` may hold spaces. */
+export function linkPaths(text: string): string {
+  return text
+    .split(/(^```[\s\S]*?^```)/m)
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part
+            .replace(/(?<![\w(\]/])`([A-Za-z]:[\\/][^`\n]+)`/g, (_m, p: string) => `[\`${p}\`](${fileHref(p)})`)
+            .replace(/(?<![\w(\]/`])([A-Za-z]:[\\/][^\s`"'<>|*?()[\]]*[^\s`"'<>|*?()[\].,;:!])/g, (_m, p: string) => `[${p}](${fileHref(p)})`),
+    )
+    .join('')
+}

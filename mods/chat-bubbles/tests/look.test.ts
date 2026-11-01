@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, outputText, pathLine, subject, userLabel } from '../hooks/look'
+import { clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, linkPaths, outputText, pathLine, subject, userLabel } from '../hooks/look'
 
 test('a run of calls reads as marks and counts in the order each kind first appeared', () => {
   expect(groupLine([{ tool: 'Read' }, { tool: 'Bash' }, { tool: 'Read' }, { tool: 'Read' }])).toBe('▤ File Read 3  ❯ Command Run 1')
@@ -48,4 +48,11 @@ test('shell lines and slash commands keep the folder; the name falls back to Doo
   expect(userLabel('')).toBe('Doole')
   expect(userLabel(undefined)).toBe('Doole')
   expect(userLabel(' Sam ')).toBe('Sam')
+})
+
+test('file paths in a reply become links; code fences and existing links stay as they are', () => {
+  expect(linkPaths('Open C:\\Users\\doole\\a.txt now.')).toBe('Open [C:\\Users\\doole\\a.txt](file:///C:/Users/doole/a.txt) now.')
+  expect(linkPaths('`E:\\REPOS\\AI TOOLS\\x.tsx:12`')).toBe('[`E:\\REPOS\\AI TOOLS\\x.tsx:12`](file:///E:/REPOS/AI%20TOOLS/x.tsx)')
+  expect(linkPaths('```\nC:\\a\\b\n```')).toBe('```\nC:\\a\\b\n```')
+  expect(linkPaths('[x](file:///C:/a/b)')).toBe('[x](file:///C:/a/b)')
 })
