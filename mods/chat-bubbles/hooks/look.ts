@@ -1,6 +1,9 @@
 export const SOFT = '#8b95a7'
 export const EDGE = '#3f4756'
 export const ACCENT = '#d9a77e'
+export const USER = '#6cb6ff'
+export const REPLY = '#5fd0a8'
+export const SUMMARY = '#b79cff'
 
 export type Kind = { icon: string; label: string }
 

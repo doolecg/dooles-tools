@@ -1,6 +1,6 @@
 import type { Register } from 'claude-code'
 
-import { ACCENT, CORNER, EDGE, SOFT, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, pathLine, shortName, subject, userLabel } from './look'
+import { ACCENT, CORNER, REPLY, SOFT, SUMMARY, USER, clip, detailLines, duration, groupLine, isCommandText, keepsRow, kindOf, pathLine, shortName, subject, userLabel } from './look'
 
 const COMMAND = 'doole_chat-bubbles'
 
@@ -40,11 +40,9 @@ export const register: Register = (on, options) => {
     const head = isCommandText(e.props.text) ? pathLine(await $.session.cwd(), (e.viewport?.columns ?? 80) - 4) : name
     return (
       <Box flexDirection="column" marginTop={1}>
-        <Text color={ACCENT} bold>{head}</Text>
-        <Box>
-          <Text bold color={ACCENT}>{CORNER}</Text>
-          <Text color={ACCENT}>{'› '}</Text>
-          <Text bold color={SOFT}>{e.props.text}</Text>
+        <Text color={USER} bold>{head}</Text>
+        <Box borderStyle="bold" borderColor={USER} paddingX={1}>
+          <Text color={SOFT}>{e.props.text}</Text>
         </Box>
       </Box>
     )
@@ -52,10 +50,10 @@ export const register: Register = (on, options) => {
 
   // Claude's reply: the same bubble, its markdown drawn as usual inside.
   on('ui.render', { component: 'AssistantMessage' }, async ($, e, next) => {
-    if (!wantBubbles || e.props.isSummary) return next(e)
+    if (!wantBubbles) return next(e)
     const { Box, Markdown } = $.ui.resolve(e)
     return (
-      <Box borderStyle="round" borderColor={EDGE} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
+      <Box borderStyle="bold" borderColor={e.props.isSummary ? SUMMARY : REPLY} paddingX={1} marginTop={e.props.isFirstOfReply ? 1 : 0}>
         <Markdown text={e.props.text} />
       </Box>
     )

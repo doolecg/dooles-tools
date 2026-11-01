@@ -1,3 +1,12 @@
+# Chat Bubbles 0.4.4
+
+## Changed
+- Your messages, Claude's replies and summaries each have their own bubble colour: blue, green and purple.
+- Bubbles have a thick edge. The corners are square.
+- Your message is now in a bubble under your name.
+
+---
+
 # Chat Bubbles 0.4.3
 
 ## Fixed

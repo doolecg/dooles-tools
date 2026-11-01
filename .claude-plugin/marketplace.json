@@ -69,7 +69,7 @@
     },
     {
       "name": "chat-bubbles",
-      "description": "Claude's replies in soft bubbles, your messages under the folder with a corner line, tool calls and code changes folded to one line, and the folder line under each reply.",
+      "description": "your messages, replies and summaries in thick-edged bubbles of their own colour, tool calls and code changes folded to one line, and the folder line under each reply.",
       "category": "productivity",
       "source": "./mods/chat-bubbles"
     },
