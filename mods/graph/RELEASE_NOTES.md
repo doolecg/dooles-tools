@@ -1,3 +1,16 @@
+# Graph 1.1.0
+
+## New
+- Portrait layout: a tall pane now gets the graph laid out to fill its height, not a small picture in the middle.
+- The graph's background is transparent, so the pane's own colour shows through.
+- The session log and the changes list are no longer shown by default. New setting "Show the session log" brings the log back.
+- A slimmer header: one row with the arrows, the project name and a status dot.
+- New: live animation (dotted borders and flowing wires keep moving while agents work). Settings: Animate, Animation speed (desktop) and Animation speed (terminal).
+- The desktop graph is now sized to fill the pane, even when the app does not report the pane's size.
+
+## Changed
+- Needs the updated viewer from Model Engine (it takes the new layout, size, log and background options).
+
 # Graph 1.0.0
 
 ## New

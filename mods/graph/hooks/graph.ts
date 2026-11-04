@@ -13,8 +13,12 @@ export const BAD_URL_TEXT = 'Graph only talks to a viewer on this computer. Set 
 /** One cell of a terminal, in pixels: the engine reports no cell size, so this is the common default. */
 export const CELL_W = 8
 export const CELL_H = 16
-/** Panes narrower than this many columns get the tall layout when the setting is auto. */
-export const TALL_BELOW = 88
+/** The most pixels a side of the picture is asked for: at scale 2 a PNG stays inside the PNG limits. */
+export const PIC_MAX = 1400
+/** The pane's slim header, in rows: the picture gets the rest of the height. */
+export const HEADER_ROWS = 1
+/** Rows the Main Menu frame (title and footer) takes from a pane shown as a tab. */
+export const TAB_CHROME_ROWS = 3
 /** The most markup an Svg element takes. */
 export const SVG_LIMIT = 131072
 
@@ -27,11 +31,17 @@ export const FETCH_TIMEOUT_MS = 5000
 export const BACKOFF_MAX_MS = 10000
 
 export type Layout = 'auto' | 'wide' | 'tall'
-export type Config = { isEnabled: boolean; viewerUrl: string; refreshMs: number; layout: Layout; showBand: boolean }
+export type Config = { isEnabled: boolean; viewerUrl: string; refreshMs: number; layout: Layout; showBand: boolean; showLog: boolean; animate: boolean; animFps: number; animFpsTerminal: number }
 
-export const DEFAULTS: Config = { isEnabled: true, viewerUrl: DEFAULT_URL, refreshMs: 1500, layout: 'auto', showBand: false }
+export const DEFAULTS: Config = { isEnabled: true, viewerUrl: DEFAULT_URL, refreshMs: 1500, layout: 'auto', showBand: false, showLog: false, animate: true, animFps: 6, animFpsTerminal: 3 }
 
 const flag = (v: unknown, fallback: boolean): boolean => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : fallback)
+
+/** `v` (a number or numeric text) rounded and held to lo..hi; `fallback` when it is neither. */
+function ranged(v: unknown, lo: number, hi: number, fallback: number): number {
+  const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v
+  return typeof n === 'number' && Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : fallback
+}
 
 export function configFrom(options: Record<string, unknown> | undefined): Config {
   const o = options ?? {}
@@ -43,6 +53,10 @@ export function configFrom(options: Record<string, unknown> | undefined): Config
     refreshMs: typeof n === 'number' && Number.isFinite(n) ? Math.max(500, Math.min(60000, Math.round(n))) : 1500,
     layout: layout === 'wide' || layout === 'tall' ? layout : 'auto',
     showBand: flag(o.showBand, false),
+    showLog: flag(o.showLog, false),
+    animate: flag(o.animate, true),
+    animFps: ranged(o.animFps, 0, 12, 6),
+    animFpsTerminal: ranged(o.animFpsTerminal, 1, 6, 3),
   }
 }
 
@@ -71,7 +85,7 @@ export type GraphState = {
   council: Council
   recall: Recall
 }
-export type Panel = { project: ProjectRef; projects: ProjectRef[]; state: GraphState; log: Row[]; changes: Row[]; at: number; sessions: number; idle: boolean }
+export type Panel = { project: ProjectRef; projects: ProjectRef[]; state: GraphState; log: Row[]; changes: Row[]; at: number; sessions: number; idle: boolean; animating: boolean }
 
 const text = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
@@ -112,6 +126,7 @@ export function parsePanel(raw: string): Panel | null {
     at: num(j.at),
     sessions: num(j.sessions),
     idle: j.idle === true,
+    animating: j.activity?.animating === true,
   }
 }
 
@@ -130,30 +145,96 @@ export function cyclePick(projects: readonly ProjectRef[], picked: string | null
   return order[(at + step + order.length) % order.length] ?? null
 }
 
-export const layoutFor = (setting: Layout, columns: number): 'wide' | 'tall' => (setting === 'auto' ? (columns < TALL_BELOW ? 'tall' : 'wide') : setting)
+/** The picture size in pixels for a pane `columns` by `rows` cells; `rows` 0 (unknown) gives a landscape box. */
+export function paneSize(columns: number, rows: number, chromeRows = HEADER_ROWS, ratio = 0.75): { width: number; height: number } {
+  const width = Math.max(320, Math.min(PIC_MAX, Math.round(Number.isFinite(columns) ? columns : 0) * CELL_W))
+  const room = Math.floor(rows) - chromeRows
+  return { width, height: room > 0 ? Math.max(160, Math.min(PIC_MAX, room * CELL_H)) : Math.min(PIC_MAX, Math.round(width * ratio)) }
+}
 
-/** The picture width in pixels for a pane `columns` wide. */
-export const pixelWidth = (columns: number): number => Math.max(320, Math.min(2400, Math.round(columns) * CELL_W))
+/** `size` scaled down, keeping its shape, until it fits `box`; centred by the caller. Never scaled up. */
+export function fitSize(size: { width: number; height: number }, box: { width: number; height: number }): { width: number; height: number } {
+  const k = Math.min(1, box.width / size.width, box.height / size.height)
+  return { width: Math.max(1, Math.round(size.width * k)), height: Math.max(1, Math.round(size.height * k)) }
+}
 
-export function graphUrl(origin: string, kind: 'state' | 'svg' | 'png', o: { folder: string; layout?: 'wide' | 'tall'; width?: number; scale?: number }): string {
+/** The width and height an SVG's root element states, when both are plain numbers. */
+export function svgSize(markup: string): { width: number; height: number } | null {
+  const root = /^\s*<svg\b[^>]*>/i.exec(markup)?.[0]
+  const w = root && /\swidth="(\d+(?:\.\d+)?)(?:px)?"/i.exec(root)
+  const h = root && /\sheight="(\d+(?:\.\d+)?)(?:px)?"/i.exec(root)
+  return w && h && Number(w[1]) > 0 && Number(h[1]) > 0 ? { width: Number(w[1]), height: Number(h[1]) } : null
+}
+
+/** The size an SVG states on its root, else its viewBox's; null when neither is usable. */
+export function svgBox(markup: string): { width: number; height: number } | null {
+  const own = svgSize(markup)
+  if (own) return own
+  const root = /^\s*<svg\b[^>]*>/i.exec(markup)?.[0]
+  const v = root && /\sviewBox="\s*[-\d.]+[\s,]+[-\d.]+[\s,]+(\d+(?:\.\d+)?)[\s,]+(\d+(?:\.\d+)?)\s*"/i.exec(root)
+  return v && Number(v[1]) > 0 && Number(v[2]) > 0 ? { width: Number(v[1]), height: Number(v[2]) } : null
+}
+
+/** `size` scaled, keeping its shape, to the biggest that fits `box` (up as well as down), so the drawing fills the pane. */
+export function fillSize(size: { width: number; height: number }, box: { width: number; height: number }): { width: number; height: number } {
+  const k = Math.min(box.width / size.width, box.height / size.height)
+  return { width: Math.max(1, Math.round(size.width * k)), height: Math.max(1, Math.round(size.height * k)) }
+}
+
+/** The markup with `width` and `height` stated on its root (and a viewBox when it had none), so it never draws at a default size. */
+export function withSize(markup: string, size: { width: number; height: number }, natural: { width: number; height: number } | null = svgBox(markup)): string {
+  const m = /^(\s*)<svg\b([^>]*)>/i.exec(markup)
+  if (!m) return markup
+  let attrs = m[2]!.replace(/\s(?:width|height)="[^"]*"/gi, '')
+  if (natural && !/\sviewBox=/i.test(attrs)) attrs += ` viewBox="0 0 ${natural.width} ${natural.height}"`
+  return `${m[1]}<svg width="${size.width}" height="${size.height}"${attrs}>${markup.slice(m[0].length)}`
+}
+
+/** One whole pulse (dim and bright) in milliseconds. */
+export const PULSE_MS = 1200
+
+/**
+ * The animated elements of an `anim=attr` SVG (those with `data-flow="<period>"`) moved on to `tick`:
+ * `stroke-dashoffset` is -((tick * 2) mod period). Elements with `data-pulse` are bright for the first half of
+ * each PULSE_MS of `elapsedMs` and dim for the second. Nothing else in the markup is touched.
+ */
+export function animateSvg(markup: string, tick: number, elapsedMs: number): string {
+  return markup.replace(/<[a-zA-Z][^<>]*\bdata-(?:flow|pulse)=[^<>]*>/g, tag => {
+    const period = Number(/\sdata-flow="(\d+(?:\.\d+)?)"/.exec(tag)?.[1])
+    if (period > 0) {
+      const m = (tick * 2) % period
+      tag = tag.replace(/(\sstroke-dashoffset=")[^"]*(")/, `$1${m === 0 ? 0 : -Math.round(m * 1000) / 1000}$2`)
+    }
+    if (/\sdata-pulse="1"/.test(tag)) {
+      const opacity = elapsedMs % PULSE_MS < PULSE_MS / 2 ? '1' : '.35'
+      tag = /\sopacity="[^"]*"/.test(tag) ? tag.replace(/(\sopacity=")[^"]*(")/, `$1${opacity}$2`) : tag.replace(/\s*(\/?>)$/, ` opacity="${opacity}"$1`)
+    }
+    return tag
+  })
+}
+
+export type PicKind = 'svg' | 'png'
+/** What a picture was drawn for: it is fetched again only when this, or the viewer's state, changes. */
+export type Want = { folder: string; layout: Layout; width: number; height: number; showLog: boolean; kind: PicKind }
+
+export function graphUrl(origin: string, kind: 'state' | 'svg' | 'png', o: { folder: string; layout?: Layout; width?: number; height?: number; showLog?: boolean; scale?: number; anim?: boolean; phase?: number }): string {
   const q = [`folder=${encodeURIComponent(o.folder)}`]
-  if (kind !== 'state') q.push(`layout=${o.layout ?? 'wide'}`, `width=${Math.round(o.width ?? 1024)}`)
+  if (kind !== 'state') q.push(`layout=${o.layout ?? 'auto'}`, `width=${Math.round(o.width ?? 1024)}`, `height=${Math.round(o.height ?? 768)}`, `log=${o.showLog ? 1 : 0}`, 'bg=transparent')
   if (kind === 'png') q.push(`scale=${o.scale ?? 2}`)
+  if (kind === 'svg' && o.anim) q.push('anim=attr')
+  if (kind !== 'state' && o.phase !== undefined) q.push(`phase=${Math.max(0, Math.min(1000, Math.round(o.phase)))}`)
   return `${origin}/panel/${kind === 'state' ? 'state' : `graph.${kind}`}?${q.join('&')}`
 }
 
-/** What a picture was drawn for: it is fetched again only when this, or the viewer's state, changes. */
-export type Want = { folder: string; layout: 'wide' | 'tall'; width: number; kind: 'svg' | 'png' }
-
-/** A fingerprint of everything the picture shows. `at` is left out: the viewer stamps it with its clock on every reply. */
-export const fingerprint = (p: Panel): string => JSON.stringify([p.project.id, p.state, p.log, p.changes])
+/** A fingerprint of everything the picture shows (the log only when it is shown). `at` is left out: the viewer stamps it with its clock on every reply. */
+export const fingerprint = (p: Panel, showLog = false): string => JSON.stringify([p.project.id, p.state, showLog ? p.log : null])
 
 /**
  * Whether the picture must be fetched again: none yet, a different request, or the viewer's state moved on
  * (its `at` is only a clock reading, so it cannot say that by itself).
  */
 export function needsPicture(prev: { want: Want; print: string } | null, want: Want, print: string): boolean {
-  return !prev || prev.print !== print || prev.want.folder !== want.folder || prev.want.layout !== want.layout || prev.want.width !== want.width || prev.want.kind !== want.kind
+  return !prev || prev.print !== print || prev.want.folder !== want.folder || prev.want.layout !== want.layout || prev.want.width !== want.width || prev.want.height !== want.height || prev.want.showLog !== want.showLog || prev.want.kind !== want.kind
 }
 
 /** Width and height of a PNG from its first 24 bytes (base64 in); null when it is not a PNG. */
@@ -181,9 +262,10 @@ export function checkPng(base64: string): { size: { width: number; height: numbe
   return { size }
 }
 
-/** The cells an Image of `size` pixels takes in a pane `columns` wide (1 to 255 each way). */
-export function cellsFor(size: { width: number; height: number }, columns: number): { columns: number; rows: number } {
-  const cols = Math.max(1, Math.min(255, Math.floor(columns)))
+/** The cells an Image of `size` pixels takes in a pane `columns` wide, and `maxRows` high when that is known (1 to 255 each way). */
+export function cellsFor(size: { width: number; height: number }, columns: number, maxRows = 0): { columns: number; rows: number } {
+  let cols = Math.max(1, Math.min(255, Math.floor(columns)))
+  if (maxRows > 0 && (cols * CELL_W * size.height) / size.width > maxRows * CELL_H) cols = Math.max(1, Math.floor((maxRows * CELL_H * size.width) / (size.height * CELL_W)))
   const rows = Math.ceil((cols * CELL_W * (size.height / size.width)) / CELL_H)
   return { columns: cols, rows: Math.max(1, Math.min(255, rows)) }
 }
@@ -237,6 +319,10 @@ export function cardsOf(s: GraphState): Card[] {
     },
   ]
 }
+
+export const SPINNER = ['-', '\\', '|', '/']
+/** The card line with a spinner glyph in front when it names a running state and `glyph` is given. */
+export const spun = (text: string, glyph: string): string => (glyph && /running|building|thinking|writing/.test(text) ? `${glyph} ${text}` : text)
 
 /** The last `n` log rows as plain lines. */
 export const logLines = (log: readonly Row[], n = 6): string[] => log.slice(-n).map(r => [r[0], r[1], r[2]].filter(Boolean).join(' '))

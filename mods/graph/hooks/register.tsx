@@ -12,30 +12,38 @@ import {
   OFF_TEXT,
   PANE,
   PNG_REFUSED_TEXT,
+  HEADER_ROWS,
   SVG_LIMIT,
+  TAB_CHROME_ROWS,
   TITLE,
+  SPINNER,
   altOf,
+  animateSvg,
   cardsOf,
+  bandDetail,
   cellsFor,
   checkPng,
   configFrom,
   cyclePick,
+  fillSize,
   fingerprint,
   folderParam,
   graphUrl,
-  layoutFor,
   logLines,
   loopbackOrigin,
   needsPicture,
+  paneSize,
   parsePanel,
-  pixelWidth,
   segmentsOf,
+  spun,
+  svgBox,
   type Config,
   type Panel,
   type Tone,
+  withSize,
   type Want,
 } from './graph'
-import { SIDEBAR_COLUMNS, isSidebarTab, sbActions, sbAsker, sbButton, sbCard, sbClip, sbFrame, sbKit, sbPaneMove, sbPalette, sbRows, sbTitle } from './sidebar-kit'
+import { SIDEBAR_COLUMNS, isSidebarTab, sbActions, sbAsker, sbCard, sbClip, sbFrame, sbKit, sbPaneMove, sbPalette, sbRows, sbTitle } from './sidebar-kit'
 import type { SbStrip } from './sidebar-kit'
 
 type Dollar = EngineInterface
@@ -63,16 +71,34 @@ let timedOut = false
 let picNote: string | null = null
 /** The viewer's last good answer. Kept outside the atom so a quiet refresh does not redraw the pane. */
 let latest: Panel | null = null
-type Pic = { data: string; want: Want; print: string; columns?: number; rows?: number }
+type Pic = { data: string; want: Want; print: string; columns?: number; rows?: number; fit?: { width: number; height: number } }
 const pics: { svg: Pic | null; png: Pic | null } = { svg: null, png: null }
-/** How wide each kind of surface drew the pane last (its columns), so the picture is asked for at that size. */
-const seen: { terminal?: number; remote?: number } = {}
+/** How big each kind of surface drew the pane last (columns, and the picture's rows; 0 when unknown), so the picture is asked for at that size. */
+type Seen = { columns: number; rows: number }
+const seen: { terminal?: Seen; remote?: Seen } = {}
 /** The Image the terminal has mounted, as cells; a new picture of that size is swapped in rather than redrawn. */
 let mounted: { columns: number; rows: number } | null = null
 let denied = 0
 /** The per-process temp folder, once made; each picture gets its own random file name in it. */
 let tempDir: string | null = null
 let fetching = false
+
+/** Live animation. Which surface drew last, and the markup the Svg shows now when it is not the viewer's own (null: the viewer's). */
+let surface: 'terminal' | 'remote' | null = null
+let shown: string | null = null
+let svgTimer: Timer | undefined
+let svgTick = 0
+/** The terminal's frame loop: one frame in flight at most, a phase counter, and the rate it runs at now (it slows when frames are slow). */
+let pngTimer: Timer | undefined
+let frameBusy = false
+let phaseN = 0
+let pngRate = DEFAULTS.animFpsTerminal
+let slowRun = 0
+let fastRun = 0
+/** The text cards' spinner, and whether the cards are what the pane shows. */
+let spinTimer: Timer | undefined
+let spin = 0
+let cardsShown = false
 
 const hex = (bytes = 8): string => {
   const a = new Uint8Array(bytes)
@@ -188,23 +214,26 @@ async function poll($: Dollar): Promise<void> {
       return
     }
 
-    const print = fingerprint(panel)
-    const changed = !latest || fingerprint(latest) !== print || view.phase !== 'ok'
+    const print = fingerprint(panel, cfg.showLog)
+    const changed = !latest || fingerprint(latest, cfg.showLog) !== print || view.phase !== 'ok'
     latest = panel
     let must = changed || view.projectName !== panel.project.name || view.projects.length !== panel.projects.length
     let swapped = false
 
     if (seen.remote !== undefined) {
-      const want: Want = { folder, layout: layoutFor(cfg.layout, seen.remote), width: pixelWidth(seen.remote), kind: 'svg' }
+      const want: Want = { folder, layout: cfg.layout, ...paneSize(seen.remote.columns, seen.remote.rows, 0, 1.6), showLog: cfg.showLog, kind: 'svg' }
       if (needsPicture(pics.svg, want, print)) {
-        const r = await bounded($, $.http.fetch(graphUrl(origin, 'svg', want))).catch(() => null)
-        const ok = r !== null && r.ok && r.text.length <= SVG_LIMIT && r.text.trimStart().startsWith('<svg')
-        pics.svg = ok ? { data: r!.text, want, print } : null
+        const r = await bounded($, $.http.fetch(graphUrl(origin, 'svg', { ...want, anim: cfg.animate }))).catch(() => null)
+        const raw = r !== null && r.ok && r.text.length <= SVG_LIMIT && r.text.trimStart().startsWith('<svg') ? r.text : null
+        const fit = raw ? fillSize(svgBox(raw) ?? want, want) : null
+        const data = raw && fit ? withSize(raw, fit) : null
+        pics.svg = data && fit && data.length <= SVG_LIMIT ? { data, want, print, fit } : null
+        shown = null
         must = true
       }
     }
     if (seen.terminal !== undefined && !view.noImages) {
-      const want: Want = { folder, layout: layoutFor(cfg.layout, seen.terminal), width: pixelWidth(seen.terminal), kind: 'png' }
+      const want: Want = { folder, layout: cfg.layout, ...paneSize(seen.terminal.columns, seen.terminal.rows, 0), showLog: cfg.showLog, kind: 'png' }
       if (needsPicture(pics.png, want, print)) {
         const data = await fetchPng($, graphUrl(origin, 'png', { ...want, scale: 2 })).catch(() => null)
         const checked = data ? checkPng(data) : null
@@ -214,7 +243,7 @@ async function poll($: Dollar): Promise<void> {
           must = true
         } else {
           const size = checked.size
-          const cells = cellsFor(size, seen.terminal)
+          const cells = cellsFor(size, seen.terminal.columns, seen.terminal.rows)
           const same = mounted !== null && mounted.columns === cells.columns && mounted.rows === cells.rows
           pics.png = { data, want, print, ...cells }
           if (same) {
@@ -235,6 +264,7 @@ async function poll($: Dollar): Promise<void> {
   } finally {
     isPolling = false
     retime($)
+    syncAnim($)
     if (!isOpen) await cleanTemp($)
   }
 }
@@ -260,6 +290,100 @@ function syncTimer($: Dollar): void {
     timer.cancel()
     timer = undefined
     void quiet(() => cleanTemp($))
+  }
+  syncAnim($)
+}
+
+/** Starts or stops each animation loop to match what is true now; safe to call at any time. */
+function syncAnim($: Dollar): void {
+  const live = cfg.isEnabled && cfg.animate && isOpen && latest?.animating === true
+  const svgOn = live && cfg.animFps > 0 && surface === 'remote' && pics.svg !== null
+  if (svgOn && !svgTimer) {
+    svgTick = 0
+    svgTimer = $.clock.every(Math.round(1000 / cfg.animFps), () => void quiet(() => svgStep($)))
+  } else if (!svgOn && svgTimer) {
+    svgTimer.cancel()
+    svgTimer = undefined
+    // one last draw with the viewer's own offsets, so a stopped graph does not freeze mid-motion
+    if (shown !== null) {
+      shown = null
+      if (isOpen) void quiet(() => redraw($))
+    }
+  }
+
+  const pngOn = live && surface === 'terminal' && pics.png?.columns !== undefined
+  if (pngOn && !pngTimer) {
+    pngRate = cfg.animFpsTerminal
+    slowRun = fastRun = 0
+    pngTimer = $.clock.every(Math.round(1000 / pngRate), () => void quiet(() => pngFrame($)))
+  } else if (!pngOn && pngTimer) {
+    pngTimer.cancel()
+    pngTimer = undefined
+  }
+
+  const spinOn = live && cardsShown
+  if (spinOn && !spinTimer) {
+    spinTimer = $.clock.every(500, () => {
+      spin += 1
+      void quiet(() => redraw($))
+    })
+  } else if (!spinOn && spinTimer) {
+    spinTimer.cancel()
+    spinTimer = undefined
+    spin = 0
+  }
+}
+
+/** One desktop tick: the markup's offsets move on locally and the Svg is drawn again. No network. */
+async function svgStep($: Dollar): Promise<void> {
+  if (!pics.svg) return
+  svgTick += 1
+  const next = animateSvg(pics.svg.data, svgTick, (svgTick * 1000) / cfg.animFps)
+  if (next === (shown ?? pics.svg.data)) return
+  shown = next
+  await redraw($)
+}
+
+/** Slows the frame loop when two frames in a row took over twice the interval (down to 1 fps), and speeds it back up after ten quick ones. */
+function pace($: Dollar, took: number): void {
+  const interval = 1000 / pngRate
+  slowRun = took > interval * 2 ? slowRun + 1 : 0
+  fastRun = took <= interval ? fastRun + 1 : 0
+  const next = slowRun >= 2 ? Math.max(1, pngRate / 2) : fastRun >= 10 ? Math.min(cfg.animFpsTerminal, pngRate * 2) : pngRate
+  if (next === pngRate) return
+  pngRate = next
+  slowRun = fastRun = 0
+  if (pngTimer) {
+    pngTimer.cancel()
+    pngTimer = $.clock.every(Math.round(1000 / pngRate), () => void quiet(() => pngFrame($)))
+  }
+}
+
+/** One terminal frame: the PNG for the next phase, swapped into the mounted Image. Skipped while the last one is still out. */
+async function pngFrame($: Dollar): Promise<void> {
+  const origin = loopbackOrigin(cfg.viewerUrl)
+  if (frameBusy || isPolling || !origin || !pics.png || !mounted || !seen.terminal) return
+  frameBusy = true
+  try {
+    const t0 = await $.clock.now()
+    phaseN = (phaseN + 1) % 1001
+    const data = await fetchPng($, graphUrl(origin, 'png', { ...pics.png.want, scale: 2, phase: phaseN })).catch(() => null)
+    const checked = data ? checkPng(data) : null
+    if (data && checked && !('refused' in checked) && pngTimer && mounted && pics.png) {
+      const cells = cellsFor(checked.size, seen.terminal.columns, seen.terminal.rows)
+      if (cells.columns === mounted.columns && cells.rows === mounted.rows) {
+        pics.png = { ...pics.png, data }
+        const r = await $.ui.blit({ requestId: PANE, key: 'graph', source: { png: data } }).catch(() => ({ deny: 'refused' }))
+        if ('deny' in r && r.deny) {
+          denied += 1
+          if (denied >= 2) await redraw($, { noImages: true })
+        } else denied = 0
+      }
+    }
+    pace($, (await $.clock.now()) - t0)
+  } finally {
+    frameBusy = false
+    if (!isOpen) await cleanTemp($)
   }
 }
 
@@ -347,39 +471,49 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
     if (!cfg.isEnabled) return next(e)
     const els = $.ui.resolve(e) as unknown as Record<string, any>
-    const { Box, Text } = els
+    const { Box, Text, Button } = els
     const view = await read($, viewAtom)
     const strip = await readStrip($)
     const columns = e.props.bodyColumns
+    // a surface that does not report its width is drawn for a generous one, not a thumbnail
+    const drawColumns = Number.isFinite(columns) && columns > 0 ? columns : 56
     const isTerminal = e.surface === 'terminal'
+    surface = isTerminal ? 'terminal' : 'remote'
+    cardsShown = false
 
-    // A surface or width not drawn for before: the picture is asked for at this size now, not at the next tick.
+    const isTab = strip !== undefined && isSidebarTab(strip, 'graph')
+    const paneRows = sbRows(e.props)
+    const picRows = paneRows > 0 ? Math.max(0, paneRows - HEADER_ROWS - (isTab ? TAB_CHROME_ROWS : 0)) : 0
+
+    // A surface or size not drawn for before: the picture is asked for at this size now, not at the next tick.
     const kind = isTerminal ? 'terminal' : 'remote'
-    if (seen[kind] !== columns) {
-      seen[kind] = columns
+    if (seen[kind]?.columns !== drawColumns || seen[kind]?.rows !== picRows) {
+      seen[kind] = { columns: drawColumns, rows: picRows }
       void quiet(() => poll($))
     }
 
-    const isTab = strip !== undefined && isSidebarTab(strip, 'graph')
-    const k = sbKit(els, e.surface, sbPalette(strip?.theme ?? 'dark', strip?.colour), columns, 0, isTab ? sbRows(e.props) : 0)
+    const k = sbKit(els, e.surface, sbPalette(strip?.theme ?? 'dark', strip?.colour), columns, 0, isTab ? paneRows : 0)
     const tone = (t: Tone) => (t === 'good' ? k.pal.good : t === 'warn' ? k.pal.warn : t === 'bad' ? k.pal.bad : t === 'info' ? k.pal.info : t === 'dim' ? k.pal.dim : k.pal.text)
     const panel = view.phase === 'ok' ? latest : null
 
     const body: unknown[] = []
     if (isTab) body.push(sbTitle(k, { icon: '◈', name: 'Graph', status: view.projectName || undefined }))
 
-    if (panel && (view.projects.length > 1 || view.pick !== null)) {
+    if (panel) {
       const go = (step: 1 | -1) => () => {
         void quiet(async () => {
           await update($, viewAtom, v => ({ ...v, pick: cyclePick(v.projects, v.pick, step) }))
           await poll($)
         })
       }
+      const canCycle = view.projects.length > 1 || view.pick !== null
+      const busy = bandDetail(panel.state) !== 'idle'
       body.push(
         <Box key="g-select" columnGap={1}>
-          {sbButton(k, 'g-prev', '‹', go(-1))}
-          <Text color={k.pal.text}>{sbClip(view.pick === null ? `${view.projectName} (this folder)` : view.projectName, Math.max(8, columns - 12))}</Text>
-          {sbButton(k, 'g-next', '›', go(1))}
+          {canCycle && <Button key="g-prev" plain onPress={go(-1)}><Text color={k.pal.accent}>‹</Text></Button>}
+          <Text color={k.pal.text} wrap="truncate-end">{sbClip(view.pick === null ? `${view.projectName} (this folder)` : view.projectName, Math.max(8, columns - 10))}</Text>
+          {canCycle && <Button key="g-next" plain onPress={go(1)}><Text color={k.pal.accent}>›</Text></Button>}
+          <Text color={busy ? k.pal.good : k.pal.dim}>●</Text>
         </Box>,
       )
     }
@@ -390,11 +524,21 @@ export const register: Register = (on, options) => {
     } else if (isTerminal && !view.noImages && pics.png?.columns !== undefined) {
       const { Image } = els
       mounted = { columns: pics.png.columns, rows: pics.png.rows! }
-      body.push(<Image key="graph" source={{ png: pics.png.data }} columns={pics.png.columns} rows={pics.png.rows} alt={sbClip(altOf(panel), Math.max(20, columns - 2))} />)
+      body.push(
+        <Box key="g-pic" justifyContent="center">
+          <Image key="graph" source={{ png: pics.png.data }} columns={pics.png.columns} rows={pics.png.rows} alt={sbClip(altOf(panel), Math.max(20, columns - 2))} />
+        </Box>,
+      )
     } else if (!isTerminal && pics.svg) {
       const { Svg } = els
-      body.push(<Svg key="g-svg" source={pics.svg.data} alt={altOf(panel)} isInteractive />)
+      body.push(
+        <Box key="g-pic" justifyContent="center">
+          <Svg key="g-svg" source={shown ?? pics.svg.data} alt={altOf(panel)} isInteractive={!cfg.animate} {...(pics.svg.fit ?? {})} />
+        </Box>,
+      )
     } else {
+      cardsShown = true
+      const glyph = cfg.animate && latest?.animating ? SPINNER[spin % SPINNER.length]! : ''
       if (isTerminal && picNote) body.push(<Text key="g-note" color={k.pal.warn}>{sbClip(picNote, Math.max(8, columns - 2))}</Text>)
       for (const card of cardsOf(panel.state)) {
         body.push(
@@ -403,19 +547,23 @@ export const register: Register = (on, options) => {
             `g-card:${card.title}`,
             <Box key={`g-body:${card.title}`} flexDirection="column">
               <Text color={k.pal.accent} bold>{card.title}</Text>
-              {card.lines.map((l, i) => <Text key={`${card.title}:${i}`} color={tone(l.tone)}>{sbClip(l.text, Math.max(8, columns - 6))}</Text>)}
+              {card.lines.map((l, i) => <Text key={`${card.title}:${i}`} color={tone(l.tone)}>{sbClip(spun(l.text, glyph), Math.max(8, columns - 6))}</Text>)}
             </Box>,
           ),
         )
       }
-      const rows = logLines(panel.log)
-      body.push(
-        <Box key="g-log" flexDirection="column">
-          <Text color={k.pal.accent} bold>LOG</Text>
-          {rows.length === 0 ? <Text color={k.pal.dim}>nothing yet</Text> : rows.map((r, i) => <Text key={`g-log:${i}`} color={k.pal.dim}>{sbClip(r, Math.max(8, columns - 2))}</Text>)}
-        </Box>,
-      )
+      if (cfg.showLog) {
+        const rows = logLines(panel.log)
+        body.push(
+          <Box key="g-log" flexDirection="column">
+            <Text color={k.pal.accent} bold>LOG</Text>
+            {rows.length === 0 ? <Text color={k.pal.dim}>nothing yet</Text> : rows.map((r, i) => <Text key={`g-log:${i}`} color={k.pal.dim}>{sbClip(r, Math.max(8, columns - 2))}</Text>)}
+          </Box>,
+        )
+      }
     }
+
+    syncAnim($)
 
     if (isTab) {
       const ask = sbAsker(args => askSidebar($, args), 'graph', () => closePane($))

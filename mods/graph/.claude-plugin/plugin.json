@@ -1,6 +1,6 @@
 {
   "name": "graph",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "license": "MIT",
   "description": "Graph: the Model Engine graph from your local viewer, in a pane. The same drawing as the dashboard, as a picture in the desktop app and in terminals that can draw one, as text cards elsewhere.",
   "types": "./types/index.d.ts",
@@ -26,7 +26,7 @@
     "layout": {
       "type": "string",
       "title": "Layout",
-      "description": "auto picks tall for a narrow pane and wide for a broad one; wide or tall force one.",
+      "description": "auto lets the viewer pick portrait for a tall pane, tall for a narrow one and wide for a broad one; wide or tall force one.",
       "options": [
         "auto",
         "wide",
@@ -39,6 +39,30 @@
       "title": "Show in the bar",
       "description": "Publish a short status such as 'Graph · building · council 1/3' for Bottom Bar to show. Keeps checking the viewer while the pane is closed. Default: off.",
       "default": false
+    },
+    "showLog": {
+      "type": "boolean",
+      "title": "Show the session log",
+      "description": "Draw the session log under the graph. Default: off, so the graph gets the whole pane.",
+      "default": false
+    },
+    "animate": {
+      "type": "boolean",
+      "title": "Animate",
+      "description": "Keep the dotted borders and flowing wires moving while agents work. Off leaves the graph still. Default: on.",
+      "default": true
+    },
+    "animFps": {
+      "type": "number",
+      "title": "Animation speed, desktop (frames per second)",
+      "description": "How often the desktop graph moves, 1 to 12; 0 turns the motion off. Default: 6.",
+      "default": 6
+    },
+    "animFpsTerminal": {
+      "type": "number",
+      "title": "Animation speed, terminal (frames per second)",
+      "description": "How many picture frames a second a terminal asks for while agents work, 1 to 6. It slows itself if frames are slow. Default: 3.",
+      "default": 3
     }
   }
 }

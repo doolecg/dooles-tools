@@ -7,7 +7,9 @@ import {
   NO_PROJECT_TEXT,
   OFF_TEXT,
   PNG_REFUSED_TEXT,
+  SPINNER,
   altOf,
+  animateSvg,
   bandDetail,
   cardsOf,
   cellsFor,
@@ -15,16 +17,21 @@ import {
   configFrom,
   cyclePick,
   fingerprint,
+  fillSize,
   folderParam,
+  fitSize,
   graphUrl,
-  layoutFor,
   logLines,
   loopbackOrigin,
   needsPicture,
   parsePanel,
-  pixelWidth,
+  paneSize,
   pngSize,
   segmentsOf,
+  spun,
+  svgBox,
+  svgSize,
+  withSize,
 } from '../hooks/graph'
 
 const T0 = 1_800_000_000_000
@@ -70,7 +77,7 @@ function pngOf(width: number, height: number): string {
 describe('settings', () => {
   test('defaults are the ones in plugin.json', () => {
     expect(configFrom(undefined)).toEqual(DEFAULTS)
-    expect(DEFAULTS).toEqual({ isEnabled: true, viewerUrl: 'http://127.0.0.1:4779', refreshMs: 1500, layout: 'auto', showBand: false })
+    expect(DEFAULTS).toEqual({ isEnabled: true, viewerUrl: 'http://127.0.0.1:4779', refreshMs: 1500, layout: 'auto', showBand: false, showLog: false, animate: true, animFps: 6, animFpsTerminal: 3 })
   })
 
   test('the refresh never goes under 500 ms and a bad layout is auto', () => {
@@ -80,6 +87,8 @@ describe('settings', () => {
     expect(configFrom({ layout: 'sideways' }).layout).toBe('auto')
     expect(configFrom({ layout: 'Tall' }).layout).toBe('tall')
     expect(configFrom({ showBand: 'true' }).showBand).toBe(true)
+    expect(configFrom({ showLog: 'true' }).showLog).toBe(true)
+    expect(configFrom({ showLog: 'nope' }).showLog).toBe(false)
     expect(configFrom({ enabled: false }).isEnabled).toBe(false)
   })
 })
@@ -160,35 +169,56 @@ describe('which project', () => {
 })
 
 describe('sizes and addresses', () => {
-  test('a narrow pane gets the tall layout unless the setting says otherwise', () => {
-    expect(layoutFor('auto', 56)).toBe('tall')
-    expect(layoutFor('auto', 120)).toBe('wide')
-    expect(layoutFor('wide', 40)).toBe('wide')
-    expect(layoutFor('tall', 200)).toBe('tall')
-    expect(pixelWidth(56)).toBe(448)
-    expect(pixelWidth(10)).toBe(320)
-    expect(pixelWidth(900)).toBe(2400)
+  test('the picture is asked for at the pane’s pixels, less the header row', () => {
+    expect(paneSize(56, 40)).toEqual({ width: 448, height: 624 })
+    expect(paneSize(120, 30)).toEqual({ width: 960, height: 464 })
+    expect(paneSize(10, 40).width).toBe(320)
+    expect(paneSize(900, 200)).toEqual({ width: 1400, height: 1400 })
+    expect(paneSize(56, 0)).toEqual({ width: 448, height: 336 })
+    expect(paneSize(56, 40, 4).height).toBe(576)
   })
 
-  test('urls carry the folder, layout and width', () => {
+  test('a picture fits the pane keeping its shape, for a portrait and a landscape pane', () => {
+    const portrait = paneSize(56, 60)
+    const fitP = fitSize({ width: 900, height: 600 }, portrait)
+    expect(fitP.width).toBeLessThanOrEqual(portrait.width)
+    expect(fitP.height).toBeLessThanOrEqual(portrait.height)
+    expect(Math.abs(fitP.width / fitP.height - 1.5)).toBeLessThan(0.05)
+    const landscape = paneSize(140, 24)
+    const fitL = fitSize({ width: 600, height: 900 }, landscape)
+    expect(fitL.height).toBeLessThanOrEqual(landscape.height)
+    expect(Math.abs(fitL.width / fitL.height - 2 / 3)).toBeLessThan(0.05)
+    expect(fitSize({ width: 100, height: 50 }, { width: 400, height: 400 })).toEqual({ width: 100, height: 50 })
+  })
+
+  test('the size an Svg states is read from its root', () => {
+    expect(svgSize('<svg width="448" height="300"></svg>')).toEqual({ width: 448, height: 300 })
+    expect(svgSize('<svg xmlns="x" width="448px" height="300.5"><g width="1"/></svg>')).toEqual({ width: 448, height: 300.5 })
+    expect(svgSize('<svg viewBox="0 0 1 1"></svg>')).toBe(null)
+  })
+
+  test('urls carry the folder, layout, size, log and a transparent background', () => {
     const o = 'http://127.0.0.1:4779'
     expect(graphUrl(o, 'state', { folder: CWD })).toBe(`${o}/panel/state?folder=${encodeURIComponent(CWD)}`)
-    expect(graphUrl(o, 'svg', { folder: 'p1', layout: 'tall', width: 448 })).toBe(`${o}/panel/graph.svg?folder=p1&layout=tall&width=448`)
-    expect(graphUrl(o, 'png', { folder: 'p1', layout: 'wide', width: 900, scale: 2 })).toBe(`${o}/panel/graph.png?folder=p1&layout=wide&width=900&scale=2`)
+    expect(graphUrl(o, 'svg', { folder: 'p1', layout: 'auto', width: 448, height: 600 })).toBe(`${o}/panel/graph.svg?folder=p1&layout=auto&width=448&height=600&log=0&bg=transparent`)
+    expect(graphUrl(o, 'svg', { folder: 'p1', layout: 'auto', width: 448, height: 600, showLog: true })).toContain('&log=1&bg=transparent')
+    expect(graphUrl(o, 'png', { folder: 'p1', layout: 'wide', width: 900, height: 500, scale: 2 })).toBe(`${o}/panel/graph.png?folder=p1&layout=wide&width=900&height=500&log=0&bg=transparent&scale=2`)
   })
 
-  test('the picture’s size comes from its PNG header and fills the pane’s cells', () => {
+  test('the picture’s size comes from its PNG header and fits the pane’s cells', () => {
     expect(pngSize(pngOf(896, 640))).toEqual({ width: 896, height: 640 })
     expect(pngSize(btoa('not a picture at all, really not'))).toBe(null)
     expect(pngSize('%%%')).toBe(null)
     expect(cellsFor({ width: 896, height: 640 }, 56)).toEqual({ columns: 56, rows: 20 })
+    expect(cellsFor({ width: 896, height: 640 }, 56, 39)).toEqual({ columns: 56, rows: 20 })
+    expect(cellsFor({ width: 896, height: 640 }, 56, 10)).toEqual({ columns: 28, rows: 10 })
     expect(cellsFor({ width: 10, height: 10000 }, 300).rows).toBe(255)
     expect(cellsFor({ width: 10, height: 10000 }, 300).columns).toBe(255)
   })
 })
 
 describe('refetching the picture', () => {
-  const want = { folder: CWD, layout: 'tall' as const, width: 448, kind: 'svg' as const }
+  const want = { folder: CWD, layout: 'auto' as const, width: 448, height: 600, showLog: false, kind: 'svg' as const }
   const p1 = parsePanel(reply())!
 
   test('the viewer’s clock reading alone never asks for a new picture', () => {
@@ -202,11 +232,102 @@ describe('refetching the picture', () => {
     const prev = { want, print: fingerprint(p1) }
     expect(needsPicture(null, want, fingerprint(p1))).toBe(true)
     expect(needsPicture(prev, want, fingerprint(parsePanel(reply({ state: state({ builder: 'building' }) }))!))).toBe(true)
-    expect(needsPicture(prev, want, fingerprint(parsePanel(reply({ log: [['1', 'a', 'b']] }))!))).toBe(true)
+    const logged = parsePanel(reply({ log: [['1', 'a', 'b']] }))!
+    expect(needsPicture(prev, want, fingerprint(logged))).toBe(false)
+    expect(needsPicture({ want: { ...want, showLog: true }, print: fingerprint(p1, true) }, { ...want, showLog: true }, fingerprint(logged, true))).toBe(true)
     expect(needsPicture(prev, { ...want, folder: 'p2' }, prev.print)).toBe(true)
     expect(needsPicture(prev, { ...want, layout: 'wide' }, prev.print)).toBe(true)
     expect(needsPicture(prev, { ...want, width: 500 }, prev.print)).toBe(true)
+    expect(needsPicture(prev, { ...want, height: 500 }, prev.print)).toBe(true)
+    expect(needsPicture(prev, { ...want, showLog: true }, prev.print)).toBe(true)
     expect(needsPicture(prev, { ...want, kind: 'png' }, prev.print)).toBe(true)
+  })
+})
+
+describe('live animation, pure parts', () => {
+  const flowing = '<svg width="448" height="300"><path d="M0 0" stroke-dasharray="4 7" stroke-dashoffset="0" data-flow="11"/><rect stroke-dasharray="2 2" stroke-dashoffset="-3" data-flow="4"/><circle r="3" data-pulse="1"/><circle r="2" opacity="1" data-pulse="1" fill="red"/><line stroke-dasharray="1 1" stroke-dashoffset="-5"/></svg>'
+
+  test('settings: animate, animFps (0 to 12, 0 is off) and animFpsTerminal (1 to 6) are held to their ranges', () => {
+    expect(configFrom({ animate: false }).animate).toBe(false)
+    expect(configFrom({ animate: 'false' }).animate).toBe(false)
+    expect(configFrom({}).animFps).toBe(6)
+    expect(configFrom({ animFps: 99 }).animFps).toBe(12)
+    expect(configFrom({ animFps: 0 }).animFps).toBe(0)
+    expect(configFrom({ animFps: -4 }).animFps).toBe(0)
+    expect(configFrom({ animFps: '8' }).animFps).toBe(8)
+    expect(configFrom({ animFps: 'fast' }).animFps).toBe(6)
+    expect(configFrom({ animFpsTerminal: 0 }).animFpsTerminal).toBe(1)
+    expect(configFrom({ animFpsTerminal: 50 }).animFpsTerminal).toBe(6)
+    expect(configFrom({ animFpsTerminal: '2' }).animFpsTerminal).toBe(2)
+  })
+
+  test('the offsets move by -(tick * 2) mod the element’s own period and wrap', () => {
+    const at = (tick: number) => animateSvg(flowing, tick, 0)
+    expect(at(0)).toContain('stroke-dashoffset="0" data-flow="11"')
+    expect(at(3)).toContain('stroke-dashoffset="-6" data-flow="11"')
+    expect(at(5)).toContain('stroke-dashoffset="-10" data-flow="11"')
+    expect(at(6)).toContain('stroke-dashoffset="-1" data-flow="11"')
+    expect(at(11)).toContain('stroke-dashoffset="0" data-flow="11"')
+    expect(at(1)).toContain('stroke-dashoffset="-2" data-flow="4"')
+    expect(at(2)).toContain('stroke-dashoffset="0" data-flow="4"')
+    expect(at(3)).toContain('stroke-dashoffset="-2" data-flow="4"')
+  })
+
+  test('data-pulse elements are bright for the first 600 ms of 1.2 s and dim for the rest; others keep their opacity', () => {
+    expect(animateSvg(flowing, 1, 0)).toContain('<circle r="3" data-pulse="1" opacity="1"/>')
+    expect(animateSvg(flowing, 1, 599)).toContain('data-pulse="1" opacity="1"/>')
+    expect(animateSvg(flowing, 1, 600)).toContain('<circle r="3" data-pulse="1" opacity=".35"/>')
+    expect(animateSvg(flowing, 1, 1199)).toContain('opacity=".35"/>')
+    expect(animateSvg(flowing, 1, 1200)).toContain('opacity="1"/>')
+    expect(animateSvg(flowing, 1, 700)).toContain('<circle r="2" opacity=".35" data-pulse="1" fill="red"/>')
+  })
+
+  test('markup without data-flow or data-pulse is left exactly as it is', () => {
+    const still = '<svg width="10" height="10"><path stroke-dasharray="4 7" stroke-dashoffset="-3"/><g opacity="1"><rect/></g></svg>'
+    for (const tick of [0, 1, 7, 200]) expect(animateSvg(still, tick, tick * 170)).toBe(still)
+    expect(animateSvg(flowing, 4, 0)).toContain('<line stroke-dasharray="1 1" stroke-dashoffset="-5"/>')
+  })
+
+  test('urls ask for anim=attr and a phase only when told to', () => {
+    const o = 'http://127.0.0.1:4779'
+    expect(graphUrl(o, 'svg', { folder: 'p1', width: 448, height: 600, anim: true })).toBe(`${o}/panel/graph.svg?folder=p1&layout=auto&width=448&height=600&log=0&bg=transparent&anim=attr`)
+    expect(graphUrl(o, 'png', { folder: 'p1', width: 448, height: 600, scale: 2, phase: 7 })).toBe(`${o}/panel/graph.png?folder=p1&layout=auto&width=448&height=600&log=0&bg=transparent&scale=2&phase=7`)
+    expect(graphUrl(o, 'png', { folder: 'p1', phase: 5000 })).toContain('&phase=1000')
+    expect(graphUrl(o, 'state', { folder: 'p1', phase: 3, anim: true })).toBe(`${o}/panel/state?folder=p1`)
+  })
+
+  test('the state’s activity.animating is read, and is false when absent', () => {
+    expect(parsePanel(reply())!.animating).toBe(false)
+    expect(parsePanel(reply({ activity: { animating: true, frameMs: 250 } }))!.animating).toBe(true)
+  })
+
+  test('a text card line with a running state gets the spinner glyph, others do not', () => {
+    expect(SPINNER).toEqual(['-', String.fromCharCode(92), '|', '/'])
+    expect(spun('building', '|')).toBe('| building')
+    expect(spun('code running…', '/')).toBe('/ code running…')
+    expect(spun('idle', '|')).toBe('idle')
+    expect(spun('building', '')).toBe('building')
+  })
+})
+
+describe('sizing the drawing to the pane', () => {
+  test('the box comes from the root’s size, else its viewBox', () => {
+    expect(svgBox('<svg width="448" height="300"></svg>')).toEqual({ width: 448, height: 300 })
+    expect(svgBox('<svg viewBox="0 0 100 160"></svg>')).toEqual({ width: 100, height: 160 })
+    expect(svgBox('<svg viewBox="0,0,50.5,20"></svg>')).toEqual({ width: 50.5, height: 20 })
+    expect(svgBox('<svg></svg>')).toBe(null)
+  })
+
+  test('fillSize scales up as well as down, keeping the shape', () => {
+    expect(fillSize({ width: 100, height: 160 }, { width: 448, height: 717 })).toEqual({ width: 448, height: 717 })
+    expect(fillSize({ width: 900, height: 600 }, { width: 450, height: 450 })).toEqual({ width: 450, height: 300 })
+    expect(fillSize({ width: 10, height: 10 }, { width: 400, height: 300 })).toEqual({ width: 300, height: 300 })
+  })
+
+  test('withSize states width and height on the root, replaces old ones, and adds a viewBox when there is none', () => {
+    expect(withSize('<svg viewBox="0 0 100 160"><g/></svg>', { width: 448, height: 717 })).toBe('<svg width="448" height="717" viewBox="0 0 100 160"><g/></svg>')
+    expect(withSize('<svg xmlns="x" width="100" height="50" stroke-width="2"><g/></svg>', { width: 400, height: 200 })).toBe('<svg width="400" height="200" xmlns="x" stroke-width="2" viewBox="0 0 100 50"><g/></svg>')
+    expect(withSize('<g/>', { width: 4, height: 4 })).toBe('<g/>')
   })
 })
 
@@ -247,10 +368,10 @@ describe('the status segment', () => {
 
 // ---------------------------------------------------------------- wiring
 
-type World = { fetched: string[]; curl: string[]; procs: string[]; temp: string; hang: boolean; blits: any[]; segments: unknown[]; opened: any[]; panes: string[]; closed: string[]; up: boolean; body: () => string; svg: string; png: string | null; deny: string | null; missing: boolean; clock: any }
+type World = { fetched: string[]; curl: string[]; procs: string[]; temp: string; hang: boolean; blits: any[]; segments: unknown[]; opened: any[]; panes: string[]; closed: string[]; up: boolean; slowMs: number; inflight: number; maxInflight: number; starts: number[]; body: () => string; svg: string; png: string | null; deny: string | null; missing: boolean; clock: any }
 
 function world(on: any): World {
-  const w: World = { fetched: [], curl: [], procs: [], temp: 'C:/Temp', hang: false, blits: [], segments: [], opened: [], panes: [], closed: [], up: true, body: () => reply(), svg: '<svg width="448" height="300"></svg>', png: pngOf(896, 640), deny: null, missing: false, clock: null }
+  const w: World = { fetched: [], curl: [], procs: [], temp: 'C:/Temp', hang: false, blits: [], segments: [], opened: [], panes: [], closed: [], up: true, slowMs: 0, inflight: 0, maxInflight: 0, starts: [], body: () => reply(), svg: '<svg width="448" height="300"></svg>', png: pngOf(896, 640), deny: null, missing: false, clock: null }
   w.clock = mock.clock(on, { now: T0 })
   mock.store(on)
   on('session.start', (_$: any, e: any) => ({ cwd: e.cwd }))
@@ -279,11 +400,16 @@ function world(on: any): World {
     return { value: { status: 404, ok: false, headers: {}, text: '{"error":"x"}' } }
   })
   on('env.get', () => ({ value: w.temp }))
-  on('process.run', (_$: any, e: any) => {
+  on('process.run', async (_$: any, e: any) => {
     const argv = e.argv as string[]
     w.procs.push(argv.join(' '))
     if (argv[0] !== 'curl') return { value: { exitCode: 0, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     w.curl.push(argv.join(' '))
+    w.starts.push(w.clock.now() - T0)
+    w.inflight += 1
+    w.maxInflight = Math.max(w.maxInflight, w.inflight)
+    if (w.slowMs > 0) await w.clock.sleep(w.slowMs)
+    w.inflight -= 1
     return { value: { exitCode: w.png ? 0 : 22, stdout: '', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('fs.read', () => ({ value: { base64: w.png ?? '' } }))
@@ -382,7 +508,7 @@ describe('wiring', () => {
     expect(w.curl).toEqual([])
   })
 
-  test('desktop: the graph is an Svg, asked for the session folder in the tall layout', async ($, on) => {
+  test('desktop: the graph is an Svg, asked for the session folder at the pane’s size, no log, transparent', async ($, on) => {
     const w = world(on)
     await $.session.start(SESSION)
     await run($)
@@ -391,7 +517,7 @@ describe('wiring', () => {
     expect(svgs).toHaveLength(1)
     expect(JSON.stringify(svgs[0])).toContain('<svg')
     expect(await ui.findAll({ type: 'Image' })).toHaveLength(0)
-    expect(w.fetched).toContain(`http://127.0.0.1:4779/panel/graph.svg?folder=${encodeURIComponent(CWD)}&layout=tall&width=448`)
+    expect(w.fetched).toContain(`http://127.0.0.1:4779/panel/graph.svg?folder=${encodeURIComponent(CWD)}&layout=auto&width=448&height=624&log=0&bg=transparent&anim=attr`)
     expect(w.curl).toEqual([])
     await ui.unmount()
   })
@@ -418,12 +544,12 @@ describe('wiring', () => {
     expect(images[0].props).toMatchObject({ key: 'graph', columns: 56, rows: 20 })
     expect(JSON.stringify(images[0])).toContain(w.png!)
     expect(w.curl[0]).toContain('/panel/graph.png?folder=')
-    expect(w.curl[0]).toContain('layout=tall&width=448&scale=2')
+    expect(w.curl[0]).toContain('layout=auto&width=448&height=624&log=0&bg=transparent&scale=2')
     expect(w.curl[0]).toContain('127.0.0.1:4779')
     await ui.unmount()
   })
 
-  test('terminal that cannot fetch the picture gets the cards and the last six log rows', async ($, on) => {
+  test('terminal that cannot fetch the picture gets just the cards, no log', async ($, on) => {
     const w = world(on)
     w.png = null
     w.body = () => reply({ log: Array.from({ length: 9 }, (_, i) => [`t${i}`, 'unit', `row${i}`]), state: state({ council: { ui: 'pass', code: 'running', run: 'idle' } }) })
@@ -433,10 +559,54 @@ describe('wiring', () => {
     expect(await ui.findAll({ type: 'Image' })).toHaveLength(0)
     const all = await textsOf(ui)
     for (const word of ['ORCHESTRATOR', 'BRAIN', 'RECALL', 'BUILDER', 'COUNCIL', 'ui pass', 'code running…', 'run idle']) expect(all).toContain(word)
+    expect(all).not.toContain('row8')
+    expect(all).not.toContain('LOG')
+    await ui.unmount()
+  })
+
+  test('showLog on: the picture is asked for with log=1 and the cards end with the last six log rows', { options: { showLog: true } }, async ($, on) => {
+    const w = world(on)
+    w.png = null
+    w.body = () => reply({ log: Array.from({ length: 9 }, (_, i) => [`t${i}`, 'unit', `row${i}`]) })
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    expect(w.curl[0]).toContain('&log=1&bg=transparent')
+    const all = await textsOf(ui)
+    expect(all).toContain('LOG')
     expect(all).toContain('row8')
     expect(all).toContain('row3')
     expect(all).not.toContain('row2')
     await ui.unmount()
+  })
+
+  test('the header is one row: arrows, the project name and a status dot', async ($, on) => {
+    world(on)
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'desktop')
+    const head = (await ui.findAll({ type: 'Box' })).find((b: any) => b.props?.key === 'g-select')
+    expect(head).toBeTruthy()
+    const text = JSON.stringify(head)
+    expect(text).toContain('‹')
+    expect(text).toContain('Model Engine (this folder)')
+    expect(text).toContain('›')
+    expect(text).toContain('●')
+    expect(text).not.toMatch(/padding|margin/i)
+    await ui.unmount()
+  })
+
+  test('a different pane size asks for a new picture', async ($, on) => {
+    const w = world(on)
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'desktop', 56)
+    const first = w.fetched.filter(u => u.includes('graph.svg')).length
+    await ui.unmount()
+    const again = await settle($, 'desktop', 70)
+    expect(w.fetched.filter(u => u.includes('graph.svg')).length).toBeGreaterThan(first)
+    expect(w.fetched.filter(u => u.includes('graph.svg')).at(-1)).toContain('width=560')
+    await again.unmount()
   })
 
   test('a terminal that shows no pictures is switched to text after two refused swaps', async ($, on) => {
@@ -608,5 +778,321 @@ describe('wiring', () => {
     const again = await mountPane($, 'desktop')
     expect(await again.findAll({ type: 'Svg' })).toHaveLength(1)
     await again.unmount()
+  })
+
+  // ------------------------------------------------------------ live animation
+
+  const FLOWING_SVG = '<svg width="448" height="300"><path d="M0 0" stroke-dasharray="4 7" stroke-dashoffset="0" data-flow="11"/><circle r="3" data-pulse="1"/><rect stroke-dasharray="2 2" stroke-dashoffset="-3" data-flow="4"/></svg>'
+  const BUSY = () => reply({ state: state({ builder: 'building', council: { ui: 'running', code: 'idle', run: 'idle' } }), activity: { animating: true, frameMs: 250 } })
+  const QUIET = () => reply({ state: state({ builder: 'building', council: { ui: 'running', code: 'idle', run: 'idle' } }), activity: { animating: false, frameMs: 250 } })
+  const svgSource = async (ui: any) => String((await ui.findAll({ type: 'Svg' }))[0]?.props?.source ?? '')
+  /** What the Svg would show now: a fresh draw of the pane. */
+  const drawnSvg = async ($: any) => {
+    const ui = await mountPane($, 'desktop')
+    const out = await svgSource(ui)
+    await ui.unmount()
+    return out
+  }
+  const stepMs = 167 // 1000 / 6 fps, rounded
+
+  test('desktop: asks for anim=attr, and the ticker moves the offsets with no network call', async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'desktop')
+    await ui.unmount()
+    expect(w.fetched.filter(u => u.includes('graph.svg')).every(u => u.endsWith('&anim=attr'))).toBe(true)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="0" data-flow="11"')
+    const before = w.fetched.length
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs)
+    expect(w.fetched.length).toBe(before)
+    const three = await drawnSvg($)
+    expect(three).toContain('stroke-dashoffset="-6" data-flow="11"')
+    expect(three).toContain('stroke-dashoffset="-2" data-flow="4"')
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="-1" data-flow="11"') // tick 6: 12 mod 11
+    expect(w.fetched.length).toBe(before)
+  })
+
+  test('desktop: data-pulse elements dim and brighten on the 1.2 s cycle', async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toContain('data-pulse="1" opacity="1"/>')
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs) // tick 4: 667 ms in
+    expect(await drawnSvg($)).toContain('data-pulse="1" opacity=".35"/>')
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs) // tick 7: 1167 ms in
+    expect(await drawnSvg($)).toContain('data-pulse="1" opacity=".35"/>')
+    await w.clock.advance(stepMs) // tick 8: 1333 ms in, the next cycle
+    expect(await drawnSvg($)).toContain('data-pulse="1" opacity="1"/>')
+  })
+
+  test('desktop: nothing moves while the viewer says nothing is animating', async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = QUIET
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    for (let i = 0; i < 4; i++) await w.clock.advance(stepMs)
+    const out = await drawnSvg($)
+    expect(out).toContain('stroke-dashoffset="0" data-flow="11"')
+    expect(out).toContain('<circle r="3" data-pulse="1"/>')
+  })
+
+  test('desktop: when animating turns false there is one last draw with the base offsets, then nothing more', async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="-6"')
+    w.body = QUIET
+    await w.clock.advance(1500 - 3 * stepMs)
+    await new Promise(r => setTimeout(r, 30))
+    const stopped = await drawnSvg($)
+    expect(stopped).toContain('stroke-dashoffset="0" data-flow="11"')
+    expect(stopped).toContain('<circle r="3" data-pulse="1"/>')
+    for (let i = 0; i < 3; i++) await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toBe(stopped)
+  })
+
+  test('desktop: closing the pane clears the timers, so nothing moves afterwards', async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    await w.clock.advance(stepMs)
+    await run($, 'close')
+    const asked = w.fetched.length
+    for (let i = 0; i < 6; i++) await w.clock.advance(stepMs)
+    await w.clock.advance(3000)
+    expect(w.fetched.length).toBe(asked)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="0" data-flow="11"')
+  })
+
+  test('animate off: the graph is asked for without anim, and stays still', { options: { animate: false } }, async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    for (let i = 0; i < 4; i++) await w.clock.advance(stepMs)
+    expect(w.fetched.filter(u => u.includes('graph.svg')).some(u => u.includes('anim='))).toBe(false)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="0" data-flow="11"')
+  })
+
+  test('animFps 0 keeps the desktop graph still', { options: { animFps: 0 } }, async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    for (let i = 0; i < 4; i++) await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="0" data-flow="11"')
+  })
+
+  test('animFps sets the tick: 2 fps moves once in 500 ms, not in 400', { options: { animFps: 2 } }, async ($, on) => {
+    const w = world(on)
+    w.svg = FLOWING_SVG
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    await w.clock.advance(400)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="0" data-flow="11"')
+    await w.clock.advance(100)
+    expect(await drawnSvg($)).toContain('stroke-dashoffset="-2" data-flow="11"')
+  })
+
+  test('desktop: a markup with no data-flow is handed over untouched while animating', async ($, on) => {
+    const w = world(on)
+    w.svg = '<svg width="448" height="300"><path stroke-dasharray="4 7" stroke-dashoffset="-3"/></svg>'
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    const first = await drawnSvg($)
+    for (let i = 0; i < 4; i++) await w.clock.advance(stepMs)
+    expect(await drawnSvg($)).toBe(first)
+    expect(first).toContain('stroke-dashoffset="-3"')
+  })
+
+  test('desktop: the Svg gets explicit width and height of 300 or more when the pane reports no size', async ($, on) => {
+    const w = world(on)
+    w.svg = '<svg viewBox="0 0 100 160"><g/></svg>'
+    await $.session.start(SESSION)
+    await run($)
+    const bare = { title: 'Graph', isFocused: false, placement: 'float', view: {} }
+    const first = await $.ui.mount({ plugin: 'graph', surface: 'desktop', component: 'Pane', requestId: 'graph', props: bare } as any)
+    await first.unmount()
+    await new Promise(r => setTimeout(r, 30))
+    const ui = await $.ui.mount({ plugin: 'graph', surface: 'desktop', component: 'Pane', requestId: 'graph', props: bare } as any)
+    const svg = (await ui.findAll({ type: 'Svg' }))[0]
+    expect(svg).toBeTruthy()
+    expect(svg.props.width).toBeGreaterThanOrEqual(300)
+    expect(svg.props.height).toBeGreaterThanOrEqual(300)
+    const root = /^<svg width="(\d+)" height="(\d+)"/.exec(String(svg.props.source))
+    expect(root).not.toBe(null)
+    expect(Number(root![1])).toBeGreaterThanOrEqual(300)
+    expect(Number(root![2])).toBeGreaterThanOrEqual(300)
+    const asked = w.fetched.find(u => u.includes('graph.svg'))!
+    const [, aw, ah] = /width=(\d+)&height=(\d+)/.exec(asked)!
+    expect(Number(aw)).toBeGreaterThanOrEqual(300)
+    expect(Number(ah)).toBe(Math.round(Number(aw) * 1.6))
+    await ui.unmount()
+  })
+
+  test('desktop: a small viewBox-only drawing is scaled up to fill the pane box', async ($, on) => {
+    const w = world(on)
+    w.svg = '<svg viewBox="0 0 100 160"><g/></svg>'
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'desktop')
+    const svg = (await ui.findAll({ type: 'Svg' }))[0]
+    expect(svg.props).toMatchObject({ width: 390, height: 624 })
+    expect(String(svg.props.source)).toContain('<svg width="390" height="624" viewBox="0 0 100 160">')
+    await ui.unmount()
+    void w
+  })
+
+  // terminal frames
+  const framesOf = (w: World) => w.curl.filter(c => c.includes('phase='))
+
+  test('terminal: while animating, PNG frames are asked for with a phase and swapped in place at animFpsTerminal', async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    expect(w.curl.some(c => c.includes('phase='))).toBe(false)
+    const blits = w.blits.length
+    await w.clock.advance(333)
+    await w.clock.advance(333)
+    await w.clock.advance(334)
+    expect(framesOf(w)).toHaveLength(3)
+    expect(framesOf(w).map(c => /phase=(\d+)/.exec(c)![1])).toEqual(['1', '2', '3'])
+    expect(w.blits.length).toBe(blits + 3)
+    expect(w.blits.at(-1)).toMatchObject({ requestId: 'graph', key: 'graph', source: { png: w.png } })
+    for (const c of framesOf(w)) expect(c).toMatch(/-o C:\/Temp\/doole-graph-[0-9a-f]{16}\/[0-9a-f]{16}\.png /)
+    expect(w.procs.filter(p => p.startsWith('cmd /c del /f /q ')).length).toBe(w.curl.length)
+    await ui.unmount()
+  })
+
+  test('terminal: frames stop when nothing is animating', async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    await w.clock.advance(333)
+    expect(framesOf(w)).toHaveLength(1)
+    w.body = QUIET
+    await w.clock.advance(1500 - 333)
+    await new Promise(r => setTimeout(r, 30))
+    const sofar = framesOf(w).length
+    await w.clock.advance(1000)
+    await w.clock.advance(1000)
+    expect(framesOf(w)).toHaveLength(sofar)
+    await ui.unmount()
+  })
+
+  test('terminal: never more than one frame in flight, however slow the viewer', async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    w.slowMs = 1000
+    for (let i = 0; i < 40; i++) await w.clock.advance(100)
+    expect(w.maxInflight).toBe(1)
+    expect(framesOf(w).length).toBeGreaterThan(1)
+    expect(framesOf(w).length).toBeLessThan(8)
+    await ui.unmount()
+  })
+
+  test('terminal: two frames slower than twice the interval halve the rate, down to 1 fps', async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    w.starts.length = 0
+    w.slowMs = 1200
+    for (let i = 0; i < 80; i++) await w.clock.advance(100)
+    // 3 fps: frames start on the 333 ms grid; each takes 1200 ms, over twice the interval
+    expect(w.starts[0]).toBe(333)
+    expect(w.starts[1]).toBe(1665)
+    // after the second slow frame ends (2865) the timer runs at 1.5 fps: its first tick is 667 ms later
+    expect(w.starts[2]).toBe(2865 + 667)
+    expect(w.maxInflight).toBe(1)
+    await ui.unmount()
+  })
+
+  test('terminal: animate off asks for no frames', { options: { animate: false } }, async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    const first = w.curl.length
+    for (let i = 0; i < 6; i++) await w.clock.advance(333)
+    expect(w.curl.length).toBe(first)
+    await ui.unmount()
+  })
+
+  test('terminal: closing the pane stops the frames', async ($, on) => {
+    const w = world(on)
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    const ui = await settle($, 'terminal')
+    await w.clock.advance(333)
+    await ui.unmount()
+    await run($, 'close')
+    const sofar = w.curl.length
+    for (let i = 0; i < 6; i++) await w.clock.advance(333)
+    expect(w.curl.length).toBe(sofar)
+  })
+
+  test('text cards: a running state gets a spinner glyph that turns twice a second while animating, and none otherwise', async ($, on) => {
+    const w = world(on)
+    w.svg = `<svg>${'x'.repeat(140_000)}</svg>`
+    w.body = BUSY
+    await $.session.start(SESSION)
+    await run($)
+    await (await settle($, 'desktop')).unmount()
+    const glyphs = /[-|/\x5c] building/
+    const textNow = async () => {
+      const ui = await mountPane($, 'desktop')
+      const t = await textsOf(ui)
+      await ui.unmount()
+      return t
+    }
+    expect(await textNow()).toMatch(glyphs)
+    const a = (await textNow()).match(/(.) building/)![1]
+    await w.clock.advance(500)
+    const b = (await textNow()).match(/(.) building/)![1]
+    expect(b).not.toBe(a)
+    w.body = QUIET
+    await w.clock.advance(1500)
+    await new Promise(r => setTimeout(r, 30))
+    const calm = await textNow()
+    expect(calm).not.toMatch(glyphs)
+    expect(calm).toContain('building')
+    await w.clock.advance(1000)
+    expect(await textNow()).toBe(calm)
   })
 })
