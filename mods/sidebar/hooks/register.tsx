@@ -31,6 +31,7 @@ const COMMAND_OF: Record<string, string> = {
   flightdeck: 'flightdeck',
   'self-improve': 'learn',
   'idea-shelf': 'ideas',
+  graph: 'doole_graph',
   'clean-view': 'simple',
   context: 'passes',
   'mod-settings': 'doole_settings',

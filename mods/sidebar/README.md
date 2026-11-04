@@ -32,7 +32,7 @@ Press `y` to add the marketplace, then pick the user scope so it loads everywher
 - **Order:** the installed mods in your order, then the mods that are switched off (dimmed, with no count), then Mod Settings, always last, whatever order you saved. A thin separator sets Mod Settings apart.
 - **Switched-off mods:** a mod is off when its Enabled setting is off. Its tab is dimmed. Opening it shows "<Mod> is off" and a Turn on button, which switches the mod back on. Turning a mod on or off in Mod Settings updates the tabs at once.
 
-- **Drawn by the mod itself:** Flightdeck, Self Improve, Idea Shelf and Mod Settings. Each mod opens its own pane when the sidebar's strip names its tab and closes it when you leave the tab. Switching tabs never runs a command, so it works while Claude is busy.
+- **Drawn by the mod itself:** Flightdeck, Self Improve, Idea Shelf, Graph and Mod Settings. Each mod opens its own pane when the sidebar's strip names its tab and closes it when you leave the tab. Switching tabs never runs a command, so it works while Claude is busy.
 - **Drawn by the Main Menu:** Task View (the job running now), Prompt Enhancer, Bottom Bar and Rule Guard (the calls it stopped this session). Each shows what the mod does and points to `/plugin` › Installed › the mod › Configure, where all mod options live.
 
 ## The footer

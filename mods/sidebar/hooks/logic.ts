@@ -21,6 +21,7 @@ export const CATALOG: readonly CatalogEntry[] = [
   { id: 'self-improve', icon: '✺', name: 'Self Improve', label: 'Improve', about: 'Learns from finished sessions and keeps soul.md.', pane: { command: 'learn' } },
   { id: 'clean-view', icon: '✶', name: 'Task View', label: 'Steps', about: 'A plain checklist above the prompt while Claude works.' },
   { id: 'idea-shelf', icon: '◇', name: 'Idea Shelf', label: 'Ideas', about: 'Park ideas while Claude works and send them later.', pane: { command: 'ideas' } },
+  { id: 'graph', icon: '◈', name: 'Graph', label: 'Graph', about: 'The Model Engine graph from your local viewer.', pane: { command: 'doole_graph' } },
   { id: 'prompt-enhancer', icon: '✎', name: 'Prompt Enhancer', label: 'Enhance', about: 'Rewrites the prompt box into a clearer prompt.' },
   { id: 'bottom-bar', icon: '▭', name: 'Bottom Bar', label: 'Bar', about: 'The rounded bar under the prompt and its toolbox.' },
   { id: 'rule-guard', icon: '⊘', name: 'Rule Guard', label: 'Rules', about: 'Stops tool calls that break your rules and tells Claude why.' },

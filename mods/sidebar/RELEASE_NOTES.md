@@ -1,3 +1,10 @@
+# Main Menu 1.9.0
+
+## New
+- Graph tab: shows what your Claude agents are doing, from the new Graph mod.
+
+---
+
 # Main Menu 1.8.0
 
 ## Fixed

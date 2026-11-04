@@ -3,7 +3,7 @@ import pathlib
 import shutil
 
 HERE = pathlib.Path(__file__).resolve().parent
-MODS = ["flightdeck", "self-improve", "idea-shelf", "clean-view", "mod-settings"]
+MODS = ["flightdeck", "self-improve", "idea-shelf", "clean-view", "mod-settings", "graph"]
 
 source = HERE / "hooks" / "sidebar-kit.tsx"
 for mod in MODS:

@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "dooles-tools",
-  "description": "doolecg's Claude Code mods: Main Menu, Flightdeck, Bottom Bar, Task View, Self Improve, Prompt Enhancer, Idea Shelf, Context, Rule Guard, Mod Settings, Chat Bubbles and Auto Plugins. The skills are in doolecg/Dooles_Skills.",
+  "description": "doolecg's Claude Code mods: Main Menu, Flightdeck, Bottom Bar, Task View, Self Improve, Prompt Enhancer, Idea Shelf, Graph, Context, Rule Guard, Mod Settings, Chat Bubbles and Auto Plugins. The skills are in doolecg/Dooles_Skills.",
   "owner": {
     "name": "doolecg",
     "email": "doolecg@gmail.com"
@@ -48,6 +48,12 @@
       "description": "Park ideas with /idea while Claude works, one shelf per project, and send them later from /ideas.",
       "category": "productivity",
       "source": "./mods/idea-shelf"
+    },
+    {
+      "name": "graph",
+      "description": "The Model Engine graph from your local viewer in a pane: the dashboard's drawing as a picture, or text cards where the screen cannot show one. Open it with /doole_graph.",
+      "category": "productivity",
+      "source": "./mods/graph"
     },
     {
       "name": "context",

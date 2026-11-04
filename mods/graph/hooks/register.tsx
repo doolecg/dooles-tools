@@ -1,0 +1,430 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, Register, StateWrite, Timer } from 'claude-code'
+
+import type { GraphView } from '../types'
+import {
+  BACKOFF_MAX_MS,
+  BAD_URL_TEXT,
+  DEFAULTS,
+  DOWN_TEXT,
+  FETCH_TIMEOUT_MS,
+  NO_PROJECT_TEXT,
+  OFF_TEXT,
+  PANE,
+  PNG_REFUSED_TEXT,
+  SVG_LIMIT,
+  TITLE,
+  altOf,
+  cardsOf,
+  cellsFor,
+  checkPng,
+  configFrom,
+  cyclePick,
+  fingerprint,
+  folderParam,
+  graphUrl,
+  layoutFor,
+  logLines,
+  loopbackOrigin,
+  needsPicture,
+  parsePanel,
+  pixelWidth,
+  segmentsOf,
+  type Config,
+  type Panel,
+  type Tone,
+  type Want,
+} from './graph'
+import { SIDEBAR_COLUMNS, isSidebarTab, sbActions, sbAsker, sbButton, sbCard, sbClip, sbFrame, sbKit, sbPaneMove, sbPalette, sbRows, sbTitle } from './sidebar-kit'
+import type { SbStrip } from './sidebar-kit'
+
+type Dollar = EngineInterface
+
+const EMPTY_VIEW: GraphView = { phase: 'loading', pick: null, projects: [], projectName: '', noImages: false, rev: 0 }
+
+const viewAtom = atom({ plugin: 'graph', key: 'view' } as const, EMPTY_VIEW)
+type Published = Record<string, { label: string; detail?: string; command: string; state?: 'idle' | 'working' | 'done' | 'error' }>
+const segmentsAtom = atom({ plugin: 'graph', key: 'segments' } as const, {} as Published)
+const askAtom = atom({ plugin: 'graph', key: 'sidebarAsk' } as const, { args: '', n: 0 })
+
+/** Asks the Sidebar to do what `/sidebar <args>` does, through this mod's own state: no command is run. */
+const askSidebar = ($: Dollar, args: string) => update($, askAtom, v => ({ args, n: (v?.n ?? 0) + 1 }))
+
+let cfg: Config = DEFAULTS
+let timer: Timer | undefined
+let isOpen = false
+let isPolling = false
+/** Requests that timed out and have not answered yet; no new poll starts while three are still out. */
+let orphans = 0
+/** How often the timer fires now: refreshMs, doubled (up to 10 s) while the viewer does not answer in time. */
+let period = DEFAULTS.refreshMs
+let timedOut = false
+/** Why the last PNG was not shown, if it was refused. */
+let picNote: string | null = null
+/** The viewer's last good answer. Kept outside the atom so a quiet refresh does not redraw the pane. */
+let latest: Panel | null = null
+type Pic = { data: string; want: Want; print: string; columns?: number; rows?: number }
+const pics: { svg: Pic | null; png: Pic | null } = { svg: null, png: null }
+/** How wide each kind of surface drew the pane last (its columns), so the picture is asked for at that size. */
+const seen: { terminal?: number; remote?: number } = {}
+/** The Image the terminal has mounted, as cells; a new picture of that size is swapped in rather than redrawn. */
+let mounted: { columns: number; rows: number } | null = null
+let denied = 0
+/** The per-process temp folder, once made; each picture gets its own random file name in it. */
+let tempDir: string | null = null
+let fetching = false
+
+const hex = (bytes = 8): string => {
+  const a = new Uint8Array(bytes)
+  globalThis.crypto.getRandomValues(a)
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('')
+}
+
+/** `p`'s answer, or a rejection after `ms`; a late answer is dropped, and counted until it lands. */
+function bounded<T>($: Dollar, p: Promise<T>, ms = FETCH_TIMEOUT_MS): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    let late = false
+    const timer = $.clock.after(ms, () => {
+      late = true
+      timedOut = true
+      orphans += 1
+      reject(new Error('viewer not responding'))
+    })
+    const landed = () => {
+      timer.cancel()
+      if (late) orphans = Math.max(0, orphans - 1)
+    }
+    p.then(
+      v => (landed(), late || resolve(v)),
+      e => (landed(), late || reject(e)),
+    )
+  })
+}
+
+async function quiet(fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn()
+  } catch {}
+}
+
+const redraw = ($: Dollar, patch: Partial<GraphView> = {}) => update($, viewAtom, v => ({ ...v, ...patch, rev: v.rev + 1 }))
+
+async function readStrip($: Dollar): Promise<SbStrip | undefined> {
+  try {
+    return (await $.state.get({ plugin: 'sidebar', key: 'strip' } as const)).value
+  } catch {
+    return undefined
+  }
+}
+
+const isWindows = (path: string): boolean => /^[A-Za-z]:|\\/.test(path)
+const winPath = (path: string): string => path.split('/').join('\\')
+
+/** Removes the temp folder if it is empty; a file still in it keeps it. */
+async function cleanTemp($: Dollar): Promise<void> {
+  if (!tempDir || fetching) return
+  const dir = tempDir
+  tempDir = null
+  await quiet(() => $.process.run(isWindows(dir) ? ['cmd', '/c', 'rmdir', winPath(dir)] : ['rmdir', dir], { timeoutMs: 5000 }))
+}
+
+/** The PNG as base64: the host's fetch only hands back text, so curl writes the file and the engine reads its bytes. */
+async function fetchPng($: Dollar, url: string): Promise<string | null> {
+  const base = ((await $.env.get('TEMP')) ?? (await $.env.get('TMPDIR')) ?? '/tmp').replace(/[\\/]+$/, '')
+  const win = isWindows(base)
+  if (!tempDir) {
+    const dir = `${base}/doole-graph-${hex()}`
+    const made = await $.process.run(win ? ['cmd', '/c', 'mkdir', winPath(dir)] : ['mkdir', '-m', '700', dir], { timeoutMs: 5000 })
+    if (made.exitCode !== 0) return null
+    tempDir = dir
+  }
+  const file = `${tempDir}/${hex()}.png`
+  fetching = true
+  try {
+    const ran = await bounded($, $.process.run(['curl', '--silent', '--show-error', '--fail', '--noproxy', '*', '--max-filesize', '4194304', '--max-time', '8', '-o', file, url], { timeoutMs: 9000 }), 10000)
+    if (ran.exitCode !== 0) return null
+    return (await $.fs.read(file, { as: 'bytes' })).base64
+  } finally {
+    await quiet(() => $.process.run(win ? ['cmd', '/c', 'del', '/f', '/q', winPath(file)] : ['rm', '-f', file], { timeoutMs: 5000 }))
+    fetching = false
+  }
+}
+
+async function publishSegments($: Dollar): Promise<void> {
+  const next = cfg.showBand ? segmentsOf(latest?.state ?? null) : {}
+  const now = await read($, segmentsAtom)
+  if (JSON.stringify(now) !== JSON.stringify(next)) await update($, segmentsAtom, () => next)
+}
+
+/** Asks the viewer once; draws again only when what the pane shows has changed. */
+async function poll($: Dollar): Promise<void> {
+  if (isPolling || orphans >= 3) return
+  isPolling = true
+  timedOut = false
+  try {
+    const origin = loopbackOrigin(cfg.viewerUrl)
+    const view = await read($, viewAtom)
+    if (!origin) {
+      latest = null
+      if (view.phase !== 'badUrl') await redraw($, { phase: 'badUrl' })
+      return
+    }
+    const folder = folderParam(await $.session.cwd(), view.pick)
+    let panel: Panel | null = null
+    let phase: GraphView['phase'] = 'down'
+    try {
+      const r = await bounded($, $.http.fetch(graphUrl(origin, 'state', { folder })))
+      if (r.ok) {
+        panel = parsePanel(r.text)
+        phase = panel ? 'ok' : 'down'
+      } else if (r.status === 404) phase = 'none'
+    } catch {}
+    if (!panel) {
+      const hadPanel = latest !== null
+      latest = null
+      pics.svg = pics.png = null
+      await publishSegments($)
+      if (hadPanel || view.phase !== phase || (phase === 'none' && view.pick !== null)) await redraw($, { phase, ...(phase === 'none' ? { pick: null } : {}) })
+      return
+    }
+
+    const print = fingerprint(panel)
+    const changed = !latest || fingerprint(latest) !== print || view.phase !== 'ok'
+    latest = panel
+    let must = changed || view.projectName !== panel.project.name || view.projects.length !== panel.projects.length
+    let swapped = false
+
+    if (seen.remote !== undefined) {
+      const want: Want = { folder, layout: layoutFor(cfg.layout, seen.remote), width: pixelWidth(seen.remote), kind: 'svg' }
+      if (needsPicture(pics.svg, want, print)) {
+        const r = await bounded($, $.http.fetch(graphUrl(origin, 'svg', want))).catch(() => null)
+        const ok = r !== null && r.ok && r.text.length <= SVG_LIMIT && r.text.trimStart().startsWith('<svg')
+        pics.svg = ok ? { data: r!.text, want, print } : null
+        must = true
+      }
+    }
+    if (seen.terminal !== undefined && !view.noImages) {
+      const want: Want = { folder, layout: layoutFor(cfg.layout, seen.terminal), width: pixelWidth(seen.terminal), kind: 'png' }
+      if (needsPicture(pics.png, want, print)) {
+        const data = await fetchPng($, graphUrl(origin, 'png', { ...want, scale: 2 })).catch(() => null)
+        const checked = data ? checkPng(data) : null
+        picNote = checked && 'refused' in checked && checked.refused !== 'format' ? PNG_REFUSED_TEXT : null
+        if (!data || !checked || 'refused' in checked) {
+          pics.png = null
+          must = true
+        } else {
+          const size = checked.size
+          const cells = cellsFor(size, seen.terminal)
+          const same = mounted !== null && mounted.columns === cells.columns && mounted.rows === cells.rows
+          pics.png = { data, want, print, ...cells }
+          if (same) {
+            const r = await $.ui.blit({ requestId: PANE, key: 'graph', source: { png: data } }).catch(() => ({ deny: 'refused' }))
+            if ('deny' in r && r.deny) {
+              denied += 1
+              if (denied >= 2) await redraw($, { noImages: true })
+            } else denied = 0
+            swapped = true
+          } else must = true
+        }
+      }
+    }
+    await publishSegments($)
+    if (must || (!swapped && changed)) {
+      await redraw($, { phase: 'ok', projects: panel.projects, projectName: panel.project.name })
+    }
+  } finally {
+    isPolling = false
+    retime($)
+    if (!isOpen) await cleanTemp($)
+  }
+}
+
+/** Asks less often while the viewer is too slow to answer, and as usual again once it does. */
+function retime($: Dollar): void {
+  const next = timedOut ? Math.min(BACKOFF_MAX_MS, Math.max(cfg.refreshMs, period * 2)) : cfg.refreshMs
+  if (next === period) return
+  period = next
+  if (timer) {
+    timer.cancel()
+    timer = $.clock.every(period, () => void quiet(() => poll($)))
+  }
+}
+
+function syncTimer($: Dollar): void {
+  const live = cfg.isEnabled && (isOpen || cfg.showBand)
+  if (live && !timer) {
+    period = cfg.refreshMs
+    timer = $.clock.every(period, () => void quiet(() => poll($)))
+    void quiet(() => poll($))
+  } else if (!live && timer) {
+    timer.cancel()
+    timer = undefined
+    void quiet(() => cleanTemp($))
+  }
+}
+
+function setOpen($: Dollar, on: boolean): void {
+  if (on && !isOpen) {
+    denied = 0
+    void quiet(() => update($, viewAtom, v => ({ ...v, noImages: false })))
+  }
+  isOpen = on
+  syncTimer($)
+}
+
+const openPane = ($: Dollar) => $.ui.open({ id: PANE, title: TITLE, closeOnEscape: true, columns: SIDEBAR_COLUMNS })
+
+async function closePane($: Dollar): Promise<void> {
+  if ((await $.ui.panes()).some(p => p.id === PANE)) await $.ui.close({ id: PANE })
+  setOpen($, false)
+}
+
+const messageOf = (phase: GraphView['phase']): string =>
+  phase === 'down' ? DOWN_TEXT : phase === 'none' ? NO_PROJECT_TEXT : phase === 'badUrl' ? BAD_URL_TEXT : 'Asking the graph viewer...'
+
+export const register: Register = (on, options) => {
+  cfg = configFrom(options as Record<string, unknown> | undefined)
+
+  on('session.start', async ($, e, next) => {
+    const ran = await next(e)
+    await quiet(async () => {
+      await $.command.register({ name: 'doole_graph', description: 'Open the Model Engine graph from your local viewer', argumentHint: '[open|close]' })
+    })
+    if (cfg.isEnabled) {
+      await quiet(async () => {
+        isOpen = (await $.ui.panes()).some(p => p.id === PANE)
+      })
+      syncTimer($)
+    }
+    return ran
+  })
+
+  on('session.end', async ($, e, next) => {
+    isOpen = false
+    syncTimer($)
+    return next(e)
+  })
+
+  on('command.run', { command: 'doole_graph' }, async ($, e) => {
+    if (!cfg.isEnabled) return { text: OFF_TEXT }
+    if (e.args.trim().toLowerCase() === 'close') {
+      await closePane($)
+      return { text: 'Graph closed.' }
+    }
+    const strip = await readStrip($)
+    const opened = await $.ui.open({ id: PANE, title: TITLE, closeOnEscape: true, ...(strip?.isOn ? { columns: SIDEBAR_COLUMNS } : {}) })
+    setOpen($, true)
+    return { text: opened.isPlaced ? 'Graph opened.' : `Graph opened; it shows once there is room: ${opened.reason}` }
+  })
+
+  // The Sidebar's strip names this tab, or moves on from it: the pane opens or closes with it.
+  on('state.set', { key: 'strip' } as never, async ($, e, next) => {
+    const ran = await next(e)
+    if (!cfg.isEnabled) return ran
+    const w = e as unknown as StateWrite
+    const move = w.plugin === 'sidebar' ? sbPaneMove('graph', w.value, w.previous) : undefined
+    await quiet(async () => {
+      if (move === 'open') {
+        await openPane($)
+        setOpen($, true)
+      } else if (move === 'close') await closePane($)
+    })
+    return ran
+  }).catch(($, e, next) => next(e))
+
+  on('ui.close', async ($, e, next) => {
+    const ran = await next(e)
+    if (cfg.isEnabled && e.id === PANE && e.origin.kind !== 'unload') {
+      setOpen($, false)
+      if (e.origin.kind === 'person') {
+        const strip = await readStrip($)
+        if (strip?.isOn && strip.active === 'graph') await quiet(() => askSidebar($, 'closed graph'))
+      }
+    }
+    return ran
+  }).catch(($, e, next) => next(e))
+
+  on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e, next) => {
+    if (!cfg.isEnabled) return next(e)
+    const els = $.ui.resolve(e) as unknown as Record<string, any>
+    const { Box, Text } = els
+    const view = await read($, viewAtom)
+    const strip = await readStrip($)
+    const columns = e.props.bodyColumns
+    const isTerminal = e.surface === 'terminal'
+
+    // A surface or width not drawn for before: the picture is asked for at this size now, not at the next tick.
+    const kind = isTerminal ? 'terminal' : 'remote'
+    if (seen[kind] !== columns) {
+      seen[kind] = columns
+      void quiet(() => poll($))
+    }
+
+    const isTab = strip !== undefined && isSidebarTab(strip, 'graph')
+    const k = sbKit(els, e.surface, sbPalette(strip?.theme ?? 'dark', strip?.colour), columns, 0, isTab ? sbRows(e.props) : 0)
+    const tone = (t: Tone) => (t === 'good' ? k.pal.good : t === 'warn' ? k.pal.warn : t === 'bad' ? k.pal.bad : t === 'info' ? k.pal.info : t === 'dim' ? k.pal.dim : k.pal.text)
+    const panel = view.phase === 'ok' ? latest : null
+
+    const body: unknown[] = []
+    if (isTab) body.push(sbTitle(k, { icon: '◈', name: 'Graph', status: view.projectName || undefined }))
+
+    if (panel && (view.projects.length > 1 || view.pick !== null)) {
+      const go = (step: 1 | -1) => () => {
+        void quiet(async () => {
+          await update($, viewAtom, v => ({ ...v, pick: cyclePick(v.projects, v.pick, step) }))
+          await poll($)
+        })
+      }
+      body.push(
+        <Box key="g-select" columnGap={1}>
+          {sbButton(k, 'g-prev', '‹', go(-1))}
+          <Text color={k.pal.text}>{sbClip(view.pick === null ? `${view.projectName} (this folder)` : view.projectName, Math.max(8, columns - 12))}</Text>
+          {sbButton(k, 'g-next', '›', go(1))}
+        </Box>,
+      )
+    }
+
+    mounted = null
+    if (!panel) {
+      body.push(<Text key="g-msg" color={k.pal.dim}>{messageOf(view.phase)}</Text>)
+    } else if (isTerminal && !view.noImages && pics.png?.columns !== undefined) {
+      const { Image } = els
+      mounted = { columns: pics.png.columns, rows: pics.png.rows! }
+      body.push(<Image key="graph" source={{ png: pics.png.data }} columns={pics.png.columns} rows={pics.png.rows} alt={sbClip(altOf(panel), Math.max(20, columns - 2))} />)
+    } else if (!isTerminal && pics.svg) {
+      const { Svg } = els
+      body.push(<Svg key="g-svg" source={pics.svg.data} alt={altOf(panel)} isInteractive />)
+    } else {
+      if (isTerminal && picNote) body.push(<Text key="g-note" color={k.pal.warn}>{sbClip(picNote, Math.max(8, columns - 2))}</Text>)
+      for (const card of cardsOf(panel.state)) {
+        body.push(
+          sbCard(
+            k,
+            `g-card:${card.title}`,
+            <Box key={`g-body:${card.title}`} flexDirection="column">
+              <Text color={k.pal.accent} bold>{card.title}</Text>
+              {card.lines.map((l, i) => <Text key={`${card.title}:${i}`} color={tone(l.tone)}>{sbClip(l.text, Math.max(8, columns - 6))}</Text>)}
+            </Box>,
+          ),
+        )
+      }
+      const rows = logLines(panel.log)
+      body.push(
+        <Box key="g-log" flexDirection="column">
+          <Text color={k.pal.accent} bold>LOG</Text>
+          {rows.length === 0 ? <Text color={k.pal.dim}>nothing yet</Text> : rows.map((r, i) => <Text key={`g-log:${i}`} color={k.pal.dim}>{sbClip(r, Math.max(8, columns - 2))}</Text>)}
+        </Box>,
+      )
+    }
+
+    if (isTab) {
+      const ask = sbAsker(args => askSidebar($, args), 'graph', () => closePane($))
+      return sbFrame(k, strip!, sbActions(ask), body)
+    }
+    return (
+      <Box flexDirection="column">
+        {body}
+      </Box>
+    )
+  })
+}

@@ -1,0 +1,44 @@
+{
+  "name": "graph",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "Graph: the Model Engine graph from your local viewer, in a pane. The same drawing as the dashboard, as a picture in the desktop app and in terminals that can draw one, as text cards elsewhere.",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "enabled": {
+      "type": "boolean",
+      "title": "Enabled",
+      "description": "Turn Graph off to stop the /doole_graph command, the pane and the status segment.",
+      "default": true
+    },
+    "viewerUrl": {
+      "type": "string",
+      "title": "Viewer address",
+      "description": "Where the Model Engine graph viewer listens. Only this computer is accepted: 127.0.0.1, localhost or [::1]. Default: http://127.0.0.1:4779.",
+      "default": "http://127.0.0.1:4779"
+    },
+    "refreshMs": {
+      "type": "number",
+      "title": "Refresh (milliseconds)",
+      "description": "How often the open pane asks the viewer for news, from 500 up. Default: 1500.",
+      "default": 1500
+    },
+    "layout": {
+      "type": "string",
+      "title": "Layout",
+      "description": "auto picks tall for a narrow pane and wide for a broad one; wide or tall force one.",
+      "options": [
+        "auto",
+        "wide",
+        "tall"
+      ],
+      "default": "auto"
+    },
+    "showBand": {
+      "type": "boolean",
+      "title": "Show in the bar",
+      "description": "Publish a short status such as 'Graph · building · council 1/3' for Bottom Bar to show. Keeps checking the viewer while the pane is closed. Default: off.",
+      "default": false
+    }
+  }
+}

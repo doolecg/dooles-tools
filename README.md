@@ -2,16 +2,16 @@
 
 # dooles-tools
 
-**Eleven mods that reshape Claude Code's own interface.**
+**Twelve mods that reshape Claude Code's own interface.**
 A bottom bar, one menu for everything, live agent bars, and a settings panel.
 
-![Mods](https://img.shields.io/badge/mods-11-D97757)
+![Mods](https://img.shields.io/badge/mods-12-D97757)
 ![Claude Code](https://img.shields.io/badge/Claude%20Code-plugin%20marketplace-6C5CE7)
 ![Terminal](https://img.shields.io/badge/works%20in-Terminal-2D3436)
 ![Desktop app](https://img.shields.io/badge/works%20in-Desktop%20app%20Code%20tab-2D3436)
 ![Licence](https://img.shields.io/badge/licence-MIT-2D3436)
 
-`✈  ✺  ✶  ◇  ✎  ▭  ⊘  ⊕  ◎  ⚙  ◆`
+`✈  ✺  ✶  ◇  ◈  ✎  ▭  ⊘  ⊕  ◎  ⚙  ◆`
 
 </div>
 
@@ -65,7 +65,7 @@ Every mod opens with `/doole_<mod>`. The plugin id is what you pass to `claude p
 
 | | Mod | Plugin id | Open with | What it does | Version |
 |---|---|---|---|---|---|
-| ◆ | **Main Menu** | `sidebar` | `/doole_main-menu` | One menu with a tab for each installed mod. Switched-off mods are dimmed. | 1.8.0 |
+| ◆ | **Main Menu** | `sidebar` | `/doole_main-menu` | One menu with a tab for each installed mod. Switched-off mods are dimmed. | 1.9.0 |
 | ▭ | **Bottom Bar** | `bottom-bar` | `/doole_bottom-bar` | A rounded bar with model, effort, context, 5-hour and 7-day usage and agents. Its Tools button opens the Main Menu. | 1.11.0 |
 | ⚙ | **Mod Settings** | `mod-settings` | `/doole_settings` | Every installed mod's settings in one side panel in the desktop app. | 0.3.0 |
 | ✈ | **Flightdeck** | `flightdeck` | `/doole_flightdeck` | The main session and every subagent working now, each as a pixel progress bar with a stop button. | 1.7.1 |
@@ -73,6 +73,7 @@ Every mod opens with `/doole_<mod>`. The plugin id is what you pass to `claude p
 | ✺ | **Self Improve** | `self-improve` | `/doole_self-improve` | Learns from finished sessions, keeps `soul.md` in step, and drafts skill fixes for your approval. | 2.5.1 |
 | ✎ | **Prompt Enhancer** | `prompt-enhancer` | `/doole_prompt-enhancer` | Rewrites the prompt box with the files, memories and skills the task needs. Nothing is sent until you press Enter. | 0.6.0 |
 | ◇ | **Idea Shelf** | `idea-shelf` | `/doole_idea-shelf` | Park ideas with `/idea` while Claude works, one shelf per project. Send them later from `/ideas`. | 0.5.1 |
+| ◈ | **Graph** | `graph` | `/doole_graph` | The Model Engine graph from your local viewer, as a picture where the screen can show one and as text cards where it cannot. | 1.0.0 |
 | ◎ | **Context** | `context` | `/doole_context` | The footer on every tab (Hindsight, CodeGraph, git) and a count of test and fix passes. | 1.2.0 |
 | ⊘ | **Rule Guard** | `rule-guard` | none | Stops tool calls that break your standing rules and tells Claude why. Its rules are switches in its settings. | 1.1.0 |
 | ⊕ | **Auto Plugins** | `auto-plugins` | none | Switches heavy, project-specific plugins (Godot, Unity, game dev, Expo, Minecraft modding, media and docs) on for this project only when the project or your prompt needs them. Run `/reload-plugins` after. | 0.1.0 |

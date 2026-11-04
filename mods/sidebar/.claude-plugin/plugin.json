@@ -1,6 +1,6 @@
 {
   "name": "sidebar",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Main Menu (called Sidebar before): one top-level menu with a tab for each of your installed mods, switched-off mods dimmed, and Mod Settings always last, in the Bottom Bar's colours.",
   "author": {
     "name": "doolecg"
